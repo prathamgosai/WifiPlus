@@ -13,6 +13,7 @@ import { detectNetwork, localNetInfo } from "./core/netinfo.js";
 import { bufferbloatVerdict, healthVerdict, qualityScores } from "./core/scoring.js";
 import { clearHistory, downloadDelta, loadHistory, saveHistoryEntry } from "./core/history.js";
 import { resultFromHash, resultLink } from "./core/permalink.js";
+import { generateAiDiagnosis } from "./core/ai-doctor.js";
 
 const qs = (selector) => document.querySelector(selector);
 const qsa = (selector) => Array.from(document.querySelectorAll(selector));
@@ -1270,6 +1271,47 @@ function bindEvents() {
       }
     }
   }));
+
+  // Mobile Bottom Sheet Handlers
+  const backdrop = qs("#bottomSheetBackdrop");
+  const aiSheet = qs("#aiDoctorSheet");
+  const closeAiSheet = qs("#closeAiDoctorSheet");
+
+  function closeSheets() {
+    if (backdrop) backdrop.classList.remove("open");
+    qsa(".bottom-sheet").forEach(s => s.classList.remove("open"));
+  }
+
+  backdrop?.addEventListener("click", closeSheets);
+  closeAiSheet?.addEventListener("click", closeSheets);
+
+  // Bottom Nav handlers
+  qsa(".mobile-bottom-nav .nav-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      qsa(".mobile-bottom-nav .nav-item").forEach((nav) => nav.classList.remove("active"));
+      item.classList.add("active");
+    });
+  });
+
+  qs("#bottomNavGo")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    qs("#speed-test")?.scrollIntoView({ behavior: "smooth" });
+    runSpeedTest();
+  });
+
+  // Offline / Online status
+  window.addEventListener("online", () => {
+    const banner = qs("#offlineBanner");
+    if (banner) banner.hidden = true;
+  });
+  window.addEventListener("offline", () => {
+    const banner = qs("#offlineBanner");
+    if (banner) banner.hidden = false;
+  });
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    const banner = qs("#offlineBanner");
+    if (banner) banner.hidden = false;
+  }
 }
 
 initTheme();

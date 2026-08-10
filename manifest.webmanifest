@@ -1,19 +1,38 @@
 {
-  "name": "WifiPlus",
+  "name": "WifiPlus — AI Internet Speed Test",
   "short_name": "WifiPlus",
-  "description": "Global AI internet speed test and ISP intelligence platform",
+  "id": "in.prathamgosai.wifiplus",
+  "description": "Real browser speed test, WiFi analyzer, ping, bufferbloat, and ISP comparison platform.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "background_color": "#071116",
   "theme_color": "#071116",
   "orientation": "any",
+  "categories": ["utilities", "productivity", "network"],
   "icons": [
     {
       "src": "icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any"
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Speed Test",
+      "short_name": "Speed Test",
+      "description": "Run real internet speed test instantly",
+      "url": "/#speed-test",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "ISP Comparison",
+      "short_name": "ISPs",
+      "description": "Compare top broadband & fiber providers",
+      "url": "/#intelligence",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
     }
   ]
 }

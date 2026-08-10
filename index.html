@@ -1894,6 +1894,325 @@
       to { background-position: 200% 0; }
     }
 
+    /* ============================================================
+       MOBILE-FIRST PWA & RESPONSIVE MASTER OVERHAUL
+       ============================================================ */
+
+    /* Mobile Bottom Navigation Bar */
+    .mobile-bottom-nav {
+      display: none;
+    }
+
+    @media (max-width: 767px) {
+      body {
+        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+      }
+
+      .mobile-bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 990;
+        height: calc(64px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        background: color-mix(in srgb, var(--bg-soft) 94%, transparent);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid var(--line);
+        align-items: center;
+        justify-content: space-around;
+        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
+      }
+
+      .mobile-bottom-nav .nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        height: 100%;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        gap: 2px;
+        transition: color 180ms ease;
+        text-decoration: none;
+      }
+
+      .mobile-bottom-nav .nav-item.active,
+      .mobile-bottom-nav .nav-item:hover {
+        color: var(--teal);
+      }
+
+      .mobile-bottom-nav .nav-icon {
+        font-size: 1.25rem;
+        line-height: 1;
+      }
+
+      .mobile-bottom-nav .go-item {
+        position: relative;
+        top: -12px;
+      }
+
+      .mobile-bottom-nav .nav-icon-go {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--teal), var(--blue));
+        color: #041113;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        font-weight: 900;
+        box-shadow: 0 8px 24px rgba(36, 209, 195, 0.45);
+        transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      .mobile-bottom-nav .go-item:active .nav-icon-go {
+        transform: scale(0.92);
+      }
+    }
+
+    /* Offline Banner */
+    .offline-banner {
+      position: fixed;
+      top: env(safe-area-inset-top, 0px);
+      left: 0;
+      right: 0;
+      z-index: 1050;
+      background: var(--coral);
+      color: #ffffff;
+      padding: 8px 16px;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      transition: transform 240ms ease;
+    }
+
+    .offline-banner[hidden] {
+      display: none !important;
+    }
+
+    /* PWA Install Prompt Banner */
+    .install-prompt-banner {
+      position: fixed;
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+      left: 16px;
+      right: 16px;
+      max-width: 440px;
+      margin: 0 auto;
+      z-index: 980;
+      background: color-mix(in srgb, var(--panel-solid) 96%, transparent);
+      border: 1px solid var(--teal);
+      border-radius: 16px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .install-prompt-banner[hidden] {
+      display: none !important;
+    }
+
+    .install-prompt-title {
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: var(--ink);
+    }
+
+    .install-prompt-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* Bottom Sheets */
+    .bottom-sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(6px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 240ms ease;
+    }
+
+    .bottom-sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bottom-sheet {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 1010;
+      max-height: 85vh;
+      background: var(--bg-soft);
+      border-top: 1px solid var(--strong-line);
+      border-radius: 24px 24px 0 0;
+      padding: 20px 24px calc(24px + env(safe-area-inset-bottom, 0px));
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 -16px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .bottom-sheet.open {
+      transform: translateY(0);
+    }
+
+    .bottom-sheet-handle {
+      width: 40px;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--line);
+      margin: 0 auto 16px;
+    }
+
+    .bottom-sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .bottom-sheet-title {
+      font-size: 1.25rem;
+      font-weight: 900;
+      margin: 0;
+    }
+
+    .bottom-sheet-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1.4rem;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    /* Test State Indicator Badge */
+    .test-state-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: rgba(36, 209, 195, 0.12);
+      color: var(--teal);
+      border: 1px solid rgba(36, 209, 195, 0.3);
+      margin-bottom: 12px;
+    }
+
+    .test-state-badge.active {
+      animation: pulse-badge 1.5s infinite alternate;
+    }
+
+    @keyframes pulse-badge {
+      from { opacity: 0.7; }
+      to { opacity: 1; transform: scale(1.03); }
+    }
+
+    /* Usability checklist card */
+    .usability-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      padding: 20px;
+      margin-top: 16px;
+    }
+
+    .usability-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .usability-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .usability-item span.icon {
+      color: var(--green);
+    }
+
+    /* Visual ISP Comparison Bar Cards for Mobile */
+    .isp-comp-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .isp-comp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .comp-bar-wrapper {
+      margin-bottom: 10px;
+    }
+
+    .comp-bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .comp-bar-track {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--line);
+      overflow: hidden;
+    }
+
+    .comp-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--teal), var(--blue));
+    }
+
+    /* RTL Support */
+    html[dir="rtl"] body {
+      direction: rtl;
+      text-align: right;
+    }
+
+    html[dir="rtl"] .crumbs li + li::before {
+      content: "\\";
+      margin-left: var(--space);
+      margin-right: 0;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .metric, .button { transition: none !important; }
       .progress-bar { animation: none; }
@@ -2672,6 +2991,61 @@
       </div>
     </div>
   </footer>
+
+  <!-- Offline Banner -->
+  <div class="offline-banner" id="offlineBanner" hidden>
+    <span>⚠️ You are offline. Browsing cached history & tools.</span>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile Navigation">
+    <a href="#speed-test" class="nav-item active" data-nav="home">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="#historyPanel" class="nav-item" data-nav="history">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">History</span>
+    </a>
+    <a href="#speed-test" class="nav-item go-item" data-nav="test" id="bottomNavGo">
+      <span class="nav-icon-go" title="Run Speed Test">⚡</span>
+    </a>
+    <a href="#doctor" class="nav-item" data-nav="doctor">
+      <span class="nav-icon">🤖</span>
+      <span class="nav-label">Doctor</span>
+    </a>
+    <a href="#intelligence" class="nav-item" data-nav="tools">
+      <span class="nav-icon">🛠</span>
+      <span class="nav-label">ISPs</span>
+    </a>
+  </nav>
+
+  <!-- PWA Install Banner -->
+  <div class="install-prompt-banner" id="installPromptBanner" hidden>
+    <div>
+      <div class="install-prompt-title">Install WifiPlus App</div>
+      <div class="install-prompt-sub">Get 1-tap speed tests & instant offline history</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="button secondary" id="installPromptDismiss" type="button" style="padding:6px 12px;min-height:36px;font-size:0.8rem;">Not now</button>
+      <button class="button" id="installPromptAccept" type="button" style="padding:6px 14px;min-height:36px;font-size:0.8rem;">Install</button>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet Backdrop & Sheets -->
+  <div class="bottom-sheet-backdrop" id="bottomSheetBackdrop"></div>
+
+  <!-- AI Doctor Fix Sheet -->
+  <div class="bottom-sheet" id="aiDoctorSheet" aria-label="AI Doctor Guidance">
+    <div class="bottom-sheet-handle"></div>
+    <div class="bottom-sheet-header">
+      <h3 class="bottom-sheet-title">🤖 AI Doctor Recommendations</h3>
+      <button class="bottom-sheet-close" id="closeAiDoctorSheet" type="button">✕</button>
+    </div>
+    <div id="aiDoctorSheetContent">
+      <p>Run a speed test to receive personalized AI connection diagnostics and router optimization steps.</p>
+    </div>
+  </div>
 
   <canvas class="result-card-canvas" id="resultCardCanvas" width="1080" height="1080"></canvas>
 

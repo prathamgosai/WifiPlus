@@ -90,11 +90,35 @@ export function clearHistory(store = defaultStore()) {
  * @returns {number | null}
  */
 export function downloadDelta(entry, previous) {
-  // `null` means not measured; 0 means measured as zero. A falsy check conflated
-  // the two, so a run that genuinely recorded 0 Mbps silently showed no change
-  // against the run before it — hiding exactly the result worth noticing.
   if (previous?.download == null || entry.download == null) return null;
-  // Division by a previous zero has no meaningful percentage.
   if (previous.download === 0) return null;
   return ((entry.download - previous.download) / previous.download) * 100;
+}
+
+/**
+ * Calculates Average, Best, and Worst stats from history.
+ * @param {HistoryStore | null} [store]
+ * @returns {object | null}
+ */
+export function getHistoryStats(store = defaultStore()) {
+  const history = loadHistory(store);
+  if (!history || history.length === 0) return null;
+
+  const validDownloads = history.map(h => h.download).filter(v => v !== null && v > 0);
+  const validUploads = history.map(h => h.upload).filter(v => v !== null && v > 0);
+  const validPings = history.map(h => h.ping).filter(v => v !== null && v > 0);
+
+  const calc = (arr) => {
+    if (arr.length === 0) return null;
+    const best = Math.max(...arr);
+    const worst = Math.min(...arr);
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+    return { best, worst, avg };
+  };
+
+  return {
+    download: calc(validDownloads),
+    upload: calc(validUploads),
+    ping: calc(validPings) // Note: For ping, lower is better, but this just gives range
+  };
 }

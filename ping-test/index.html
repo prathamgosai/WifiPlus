@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Ping Test — Measure Latency, Median and p95 | WifiPlus</title>
+<meta name="description" content="Free browser ping test showing median latency, the p95 tail and packet loss from up to 20 probes. See the delay that actually affects calls and games.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="Pratham Gosai">
+<link rel="canonical" href="https://wifiplus.prathamgosai.in/ping-test/">
+<link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/ping-test/">
+<link rel="alternate" hreflang="x-default" href="https://wifiplus.prathamgosai.in/ping-test/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="WifiPlus">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="https://wifiplus.prathamgosai.in/ping-test/">
+<meta property="og:title" content="Ping Test — Measure Latency, Median and p95 | WifiPlus">
+<meta property="og:description" content="Free browser ping test showing median latency, the p95 tail and packet loss from up to 20 probes. See the delay that actually affects calls and games.">
+<meta property="og:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Ping Test — Measure Latency, Median and p95 | WifiPlus">
+<meta name="twitter:description" content="Free browser ping test showing median latency, the p95 tail and packet loss from up to 20 probes. See the delay that actually affects calls and games.">
+<meta name="twitter:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta name="theme-color" content="#071116">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/landing.css">
+<link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://cloudflare-dns.com">
+<link rel="modulepreload" href="/landing.js">
+<link rel="modulepreload" href="/core/measure.js">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://wifiplus.prathamgosai.in/ping-test/#webpage","url":"https://wifiplus.prathamgosai.in/ping-test/","name":"Ping Test — Measure Latency, Median and p95 | WifiPlus","description":"Free browser ping test showing median latency, the p95 tail and packet loss from up to 20 probes. See the delay that actually affects calls and games.","inLanguage":"en","isPartOf":{"@id":"https://wifiplus.prathamgosai.in/#website"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://wifiplus.prathamgosai.in/og-image.png"},"breadcrumb":{"@id":"https://wifiplus.prathamgosai.in/ping-test/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://wifiplus.prathamgosai.in/ping-test/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://wifiplus.prathamgosai.in/"},{"@type":"ListItem","position":2,"name":"Ping test","item":"https://wifiplus.prathamgosai.in/ping-test/"}]},{"@type":"WebApplication","name":"WifiPlus — Ping test","url":"https://wifiplus.prathamgosai.in/ping-test/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript and a modern browser","inLanguage":"en","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Person","name":"Pratham Gosai"}},{"@type":"FAQPage","@id":"https://wifiplus.prathamgosai.in/ping-test/#faq","inLanguage":"en","mainEntity":[{"@type":"Question","name":"What is a good ping for gaming?","acceptedAnswer":{"@type":"Answer","text":"Under 30 ms to the game server is comfortable for most competitive titles, and under 50 ms is playable. Consistency matters as much as the number: 40 ms that never varies beats 20 ms that spikes to 200."}},{"@type":"Question","name":"Why does my ping change between tests?","acceptedAnswer":{"@type":"Answer","text":"Ping depends on the route, the server you reach, and how busy your own link is at that moment. Testing while something is downloading will inflate the result — which is itself worth measuring, and is what the bufferbloat test isolates."}},{"@type":"Question","name":"Can I lower my ping?","acceptedAnswer":{"@type":"Answer","text":"Some of it is physics — distance to the server sets a floor no equipment can beat. The part you can change: use Ethernet instead of WiFi, avoid a congested 2.4 GHz band, close background uploads, and enable Smart Queue Management on your router to stop latency rising under load."}},{"@type":"Question","name":"Is ping the same as latency?","acceptedAnswer":{"@type":"Answer","text":"In everyday use, yes. Strictly, latency is the one-way delay and ping is the round trip, so ping is roughly double the one-way latency plus the server's own processing time."}}]}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/">WifiPlus</a>
+  <nav aria-label="Primary">
+    <a href="/">Full test</a>
+  </nav>
+</header>
+
+<main id="main">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Home</a></li>
+      <li aria-current="page">Ping test</li>
+    </ol>
+  </nav>
+
+  <article>
+    <h1>Ping test</h1>
+    <p class="standfirst">Latency decides how responsive your connection feels. Speed does not.</p>
+    
+
+    <!-- The live test. Same engine as the full tool: real bytes, no simulation.
+         Localised strings arrive as data attributes because CSP forbids inline
+         script, and landing.js reads them from here. -->
+    <section class="tool" aria-label="Ping test"
+      data-phase-ping="PING"
+      data-phase-download="DOWNLOAD"
+      data-phase-upload="UPLOAD"
+      data-status-latency="Measuring ping, jitter, packet loss and DNS…"
+      data-status-download="Measuring download and latency under load…"
+      data-status-upload="Measuring upload…"
+      data-status-failed="Test failed. Check your connection and try again."
+      data-label-again="AGAIN"
+      data-verdict-good="Your router keeps queues short. Calls and games hold up while other devices download."
+      data-verdict-queueing="Noticeable queueing. Enabling Smart Queue Management (SQM/fq_codel) on your router would fix this."
+      data-verdict-severe="Severe bufferbloat. Calls will break up whenever anyone else downloads — a router queue problem, not a speed problem.">
+      <div class="stage">
+        <button class="go" id="goButton" type="button">GO</button>
+        <p class="caption" id="goCaption">Press GO — about 6 seconds, no signup.</p>
+        <div class="readout" id="readout" hidden>
+          <p class="phase" id="phase">PING</p>
+          <p class="value"><span id="value">0.00</span> <span class="unit" id="unit">ms</span></p>
+          <div class="track"><span id="bar"></span></div>
+        </div>
+      </div>
+      <dl class="results" id="results" hidden>
+        <div><dt>Download</dt><dd id="rDownload">--<span>Mbps</span></dd></div>
+        <div><dt>Upload</dt><dd id="rUpload">--<span>Mbps</span></dd></div>
+        <div><dt>Ping</dt><dd id="rPing">--<span>ms</span></dd></div>
+        <div><dt>Jitter</dt><dd id="rJitter">--<span>ms</span></dd></div>
+        <div><dt>Packet loss</dt><dd id="rLoss">--<span>%</span></dd></div>
+        <div><dt>DNS</dt><dd id="rDns">--<span>ms</span></dd></div>
+        <div><dt>Bufferbloat</dt><dd id="rBloat">--<span>grade</span></dd></div>
+        <div><dt>Stability</dt><dd id="rStability">--<span>%</span></dd></div>
+      </dl>
+      <p class="status" id="status" role="status" aria-live="polite">Ready.</p>
+    </section>
+
+    <p>Ping is the round trip time between your device and a server: how long a single small request takes to go out and come back. It is measured in milliseconds, and it is the number that decides whether a video call feels natural, whether a game registers your input, and whether a web page appears instantly or after a beat.</p>
+    <p>This test sends up to twenty separate probes and reports the whole distribution rather than one number — the minimum, the median, the 95th percentile and the maximum. A single ping figure hides the thing that actually ruins calls: the occasional probe that takes five times as long as the rest.</p>
+
+    <h2>Why the median, not the average</h2>
+    <p>One scheduling hiccup on a busy device can add hundreds of milliseconds to a single probe. An average drags that outlier into every reported result; a median ignores it and describes the typical round trip honestly. That is why the headline figure here is the median of the samples, with the outliers reported separately where you can see them for what they are.</p>
+
+    <h2>The p95 is the number that hurts</h2>
+    <p>The 95th percentile is the latency your worst one-in-twenty packets experience. A connection with a 20 ms median and a 400 ms p95 will feel unpredictable — mostly fine, then suddenly stuttering — even though its headline ping looks excellent. Calls and competitive games break on the tail, not the median, so this test measures and reports it.</p>
+
+    <h2>What counts as good latency</h2>
+    <p>Under 20 ms is excellent and typical of fibre to a nearby server. 20-50 ms is good and will not be noticed in normal use. 50-100 ms is fine for browsing and video but noticeable in fast games. Above 150 ms, calls start to develop the talking-over-each-other problem. Satellite links sit far above this range by physics, not by fault.</p>
+
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      <details><summary><h3>What is a good ping for gaming?</h3></summary><p>Under 30 ms to the game server is comfortable for most competitive titles, and under 50 ms is playable. Consistency matters as much as the number: 40 ms that never varies beats 20 ms that spikes to 200.</p></details>
+      <details><summary><h3>Why does my ping change between tests?</h3></summary><p>Ping depends on the route, the server you reach, and how busy your own link is at that moment. Testing while something is downloading will inflate the result — which is itself worth measuring, and is what the bufferbloat test isolates.</p></details>
+      <details><summary><h3>Can I lower my ping?</h3></summary><p>Some of it is physics — distance to the server sets a floor no equipment can beat. The part you can change: use Ethernet instead of WiFi, avoid a congested 2.4 GHz band, close background uploads, and enable Smart Queue Management on your router to stop latency rising under load.</p></details>
+      <details><summary><h3>Is ping the same as latency?</h3></summary><p>In everyday use, yes. Strictly, latency is the one-way delay and ping is the round trip, so ping is roughly double the one-way latency plus the server's own processing time.</p></details>
+    </div>
+
+    <h2>Related tests</h2>
+    <ul class="related">
+        <li><a href="/jitter-test/"><strong>Jitter test</strong><span>Jitter is why a call breaks up on a connection whose speed test looks perfect.</span></a></li>
+        <li><a href="/bufferbloat-test/"><strong>Bufferbloat test</strong><span>This is the measurement that explains why your call falls apart the moment someone else starts a download.</span></a></li>
+        <li><a href="/packet-loss-test/"><strong>Packet loss test</strong><span>A connection can lose packets and still report a perfect download speed.</span></a></li>
+    </ul>
+
+    <p class="cta"><a href="/">Run the full test — every metric in one pass →</a></p>
+  </article>
+</main>
+
+<footer class="bar foot">
+  <p>WifiPlus — real measurement, no signup, no ads.</p>
+</footer>
+
+<script type="module" src="/landing.js"></script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>WiFi Analyzer — Diagnose Slow Wireless, Jitter and Coverage | WifiPlus</title>
+<meta name="description" content="Free WiFi analyzer for speed, ping, jitter, packet loss, DNS and bufferbloat. Diagnose slow wireless, weak signal and router queueing.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="Pratham Gosai">
+<link rel="canonical" href="https://wifiplus.prathamgosai.in/wifi-analyzer/">
+<link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/wifi-analyzer/">
+<link rel="alternate" hreflang="x-default" href="https://wifiplus.prathamgosai.in/wifi-analyzer/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="WifiPlus">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="https://wifiplus.prathamgosai.in/wifi-analyzer/">
+<meta property="og:title" content="WiFi Analyzer — Diagnose Slow Wireless, Jitter and Coverage | WifiPlus">
+<meta property="og:description" content="Free WiFi analyzer for speed, ping, jitter, packet loss, DNS and bufferbloat. Diagnose slow wireless, weak signal and router queueing.">
+<meta property="og:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="WiFi Analyzer — Diagnose Slow Wireless, Jitter and Coverage | WifiPlus">
+<meta name="twitter:description" content="Free WiFi analyzer for speed, ping, jitter, packet loss, DNS and bufferbloat. Diagnose slow wireless, weak signal and router queueing.">
+<meta name="twitter:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta name="theme-color" content="#071116">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/landing.css">
+<link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://cloudflare-dns.com">
+<link rel="modulepreload" href="/landing.js">
+<link rel="modulepreload" href="/core/measure.js">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://wifiplus.prathamgosai.in/wifi-analyzer/#webpage","url":"https://wifiplus.prathamgosai.in/wifi-analyzer/","name":"WiFi Analyzer — Diagnose Slow Wireless, Jitter and Coverage | WifiPlus","description":"Free WiFi analyzer for speed, ping, jitter, packet loss, DNS and bufferbloat. Diagnose slow wireless, weak signal and router queueing.","inLanguage":"en","isPartOf":{"@id":"https://wifiplus.prathamgosai.in/#website"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://wifiplus.prathamgosai.in/og-image.png"},"breadcrumb":{"@id":"https://wifiplus.prathamgosai.in/wifi-analyzer/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://wifiplus.prathamgosai.in/wifi-analyzer/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://wifiplus.prathamgosai.in/"},{"@type":"ListItem","position":2,"name":"WiFi analyzer","item":"https://wifiplus.prathamgosai.in/wifi-analyzer/"}]},{"@type":"WebApplication","name":"WifiPlus — WiFi analyzer","url":"https://wifiplus.prathamgosai.in/wifi-analyzer/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript and a modern browser","inLanguage":"en","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Person","name":"Pratham Gosai"}},{"@type":"FAQPage","@id":"https://wifiplus.prathamgosai.in/wifi-analyzer/#faq","inLanguage":"en","mainEntity":[{"@type":"Question","name":"Can a browser analyze WiFi?","acceptedAnswer":{"@type":"Answer","text":"It cannot read every router radio statistic, but it can measure the user-visible effects: throughput, ping, jitter, loss and latency under load from the device you are using."}},{"@type":"Question","name":"How do I know if my router placement is bad?","acceptedAnswer":{"@type":"Answer","text":"If results improve greatly near the router and degrade in one room, placement, walls or interference are likely. Put the router central, elevated and away from metal, cabinets and thick walls."}},{"@type":"Question","name":"Should I use 2.4 GHz, 5 GHz or 6 GHz?","acceptedAnswer":{"@type":"Answer","text":"Use 5 GHz or 6 GHz when you are near the router and need speed or low jitter. Use 2.4 GHz for range and low-bandwidth smart devices, but expect more congestion."}}]}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/">WifiPlus</a>
+  <nav aria-label="Primary">
+    <a href="/">Full test</a>
+  </nav>
+</header>
+
+<main id="main">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Home</a></li>
+      <li aria-current="page">WiFi analyzer</li>
+    </ol>
+  </nav>
+
+  <article>
+    <h1>WiFi analyzer</h1>
+    <p class="standfirst">Find whether your slow internet is really the provider, the router, or the wireless hop in your home.</p>
+    
+
+    <!-- The live test. Same engine as the full tool: real bytes, no simulation.
+         Localised strings arrive as data attributes because CSP forbids inline
+         script, and landing.js reads them from here. -->
+    <section class="tool" aria-label="WiFi analyzer"
+      data-phase-ping="PING"
+      data-phase-download="DOWNLOAD"
+      data-phase-upload="UPLOAD"
+      data-status-latency="Measuring ping, jitter, packet loss and DNS…"
+      data-status-download="Measuring download and latency under load…"
+      data-status-upload="Measuring upload…"
+      data-status-failed="Test failed. Check your connection and try again."
+      data-label-again="AGAIN"
+      data-verdict-good="Your router keeps queues short. Calls and games hold up while other devices download."
+      data-verdict-queueing="Noticeable queueing. Enabling Smart Queue Management (SQM/fq_codel) on your router would fix this."
+      data-verdict-severe="Severe bufferbloat. Calls will break up whenever anyone else downloads — a router queue problem, not a speed problem.">
+      <div class="stage">
+        <button class="go" id="goButton" type="button">GO</button>
+        <p class="caption" id="goCaption">Press GO — about 6 seconds, no signup.</p>
+        <div class="readout" id="readout" hidden>
+          <p class="phase" id="phase">PING</p>
+          <p class="value"><span id="value">0.00</span> <span class="unit" id="unit">ms</span></p>
+          <div class="track"><span id="bar"></span></div>
+        </div>
+      </div>
+      <dl class="results" id="results" hidden>
+        <div><dt>Download</dt><dd id="rDownload">--<span>Mbps</span></dd></div>
+        <div><dt>Upload</dt><dd id="rUpload">--<span>Mbps</span></dd></div>
+        <div><dt>Ping</dt><dd id="rPing">--<span>ms</span></dd></div>
+        <div><dt>Jitter</dt><dd id="rJitter">--<span>ms</span></dd></div>
+        <div><dt>Packet loss</dt><dd id="rLoss">--<span>%</span></dd></div>
+        <div><dt>DNS</dt><dd id="rDns">--<span>ms</span></dd></div>
+        <div><dt>Bufferbloat</dt><dd id="rBloat">--<span>grade</span></dd></div>
+        <div><dt>Stability</dt><dd id="rStability">--<span>%</span></dd></div>
+      </dl>
+      <p class="status" id="status" role="status" aria-live="polite">Ready.</p>
+    </section>
+
+    <p>A WiFi analyzer is useful only if it separates symptoms. Slow download suggests weak signal or congestion. High jitter suggests inconsistent airtime. Packet loss points to interference or a failing path. Bufferbloat points to router queues. WifiPlus measures those symptoms together so you can fix the right layer.</p>
+    <p>The browser cannot see every radio detail your router sees, but it can measure the end result: how the network behaves from the device you actually use. That is often the more important view, because a perfect router status page does not help if your laptop in the bedroom drops packets.</p>
+
+    <h2>The fastest diagnosis path</h2>
+    <p>Start with the test where the problem happens. If WiFi is slow, repeat near the router. If it improves sharply, coverage or interference is the issue. If it stays bad, repeat over Ethernet. If Ethernet is also poor, look at the provider, modem or router CPU. If only calls fail while downloads are fast, look at jitter, loss and bufferbloat before buying a faster plan.</p>
+
+    <h2>What weak WiFi looks like</h2>
+    <p>Weak WiFi usually shows lower download, lower upload, higher jitter and sometimes packet loss. The result may change dramatically when you move a few meters because walls, furniture, neighboring networks and device antenna orientation all change the radio path.</p>
+
+    <h2>What router queueing looks like</h2>
+    <p>Router queueing looks different: idle ping can be excellent, but latency under load jumps when a download or upload starts. That means the wireless signal may be fine while the router buffers too much data. Smart Queue Management is the fix; a speed upgrade often leaves the problem untouched.</p>
+
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      <details><summary><h3>Can a browser analyze WiFi?</h3></summary><p>It cannot read every router radio statistic, but it can measure the user-visible effects: throughput, ping, jitter, loss and latency under load from the device you are using.</p></details>
+      <details><summary><h3>How do I know if my router placement is bad?</h3></summary><p>If results improve greatly near the router and degrade in one room, placement, walls or interference are likely. Put the router central, elevated and away from metal, cabinets and thick walls.</p></details>
+      <details><summary><h3>Should I use 2.4 GHz, 5 GHz or 6 GHz?</h3></summary><p>Use 5 GHz or 6 GHz when you are near the router and need speed or low jitter. Use 2.4 GHz for range and low-bandwidth smart devices, but expect more congestion.</p></details>
+    </div>
+
+    <h2>Related tests</h2>
+    <ul class="related">
+        <li><a href="/wifi-speed-test/"><strong>WiFi speed test</strong><span>Measure what your wireless connection actually delivers right now — not what the plan promises.</span></a></li>
+        <li><a href="/jitter-test/"><strong>Jitter test</strong><span>Jitter is why a call breaks up on a connection whose speed test looks perfect.</span></a></li>
+        <li><a href="/bufferbloat-test/"><strong>Bufferbloat test</strong><span>This is the measurement that explains why your call falls apart the moment someone else starts a download.</span></a></li>
+    </ul>
+
+    <p class="cta"><a href="/">Run the full test — every metric in one pass →</a></p>
+  </article>
+</main>
+
+<footer class="bar foot">
+  <p>WifiPlus — real measurement, no signup, no ads.</p>
+</footer>
+
+<script type="module" src="/landing.js"></script>
+</body>
+</html>

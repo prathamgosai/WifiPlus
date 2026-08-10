@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/internet-speed-test/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/internet-speed-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/wifi-speed-test/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/wifi-speed-test/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://wifiplus.prathamgosai.in/es/test-de-velocidad-wifi/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://wifiplus.prathamgosai.in/hi/wifi-speed-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/es/test-de-velocidad-wifi/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/wifi-speed-test/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://wifiplus.prathamgosai.in/es/test-de-velocidad-wifi/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://wifiplus.prathamgosai.in/hi/wifi-speed-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/hi/wifi-speed-test/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/wifi-speed-test/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://wifiplus.prathamgosai.in/es/test-de-velocidad-wifi/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://wifiplus.prathamgosai.in/hi/wifi-speed-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/wifi-analyzer/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/wifi-analyzer/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/ping-test/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/ping-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/jitter-test/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/jitter-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/packet-loss-test/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/packet-loss-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/bufferbloat-test/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/bufferbloat-test/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://wifiplus.prathamgosai.in/hi/bufferbloat-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/bufferbloat-test/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://wifiplus.prathamgosai.in/hi/bufferbloat-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/hi/bufferbloat-test/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/bufferbloat-test/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://wifiplus.prathamgosai.in/hi/bufferbloat-test/"/>
+  </url>
+  <url>
+    <loc>https://wifiplus.prathamgosai.in/dns-speed-test/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/dns-speed-test/"/>
+  </url>
+</urlset>

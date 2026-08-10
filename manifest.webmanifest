@@ -1,0 +1,19 @@
+{
+  "name": "WifiPlus",
+  "short_name": "WifiPlus",
+  "description": "Global AI internet speed test and ISP intelligence platform",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#071116",
+  "theme_color": "#071116",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

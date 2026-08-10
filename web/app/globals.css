@@ -1,0 +1,577 @@
+@import "tailwindcss";
+
+/* =============================================================================
+   WifiPlus — Liquid Glass design system
+   -----------------------------------------------------------------------------
+   Layer 0  tokens      design decisions, nothing visual
+   Layer 1  base        page shell, typography, focus, scrollbar
+   Layer 2  components  the glass primitives every section reuses
+   Layer 3  keyframes   ambient motion (CSS only — never blocks the main thread)
+
+   Everything visual reads from a CSS variable so the light theme is a token
+   swap, not a second stylesheet.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   Layer 0 — Tailwind theme tokens (generate `bg-*`, `text-*`, `border-*` …)
+   ------------------------------------------------------------------------ */
+@theme {
+  /* Brand — Signal Indigo #5B5FF0 → Aurora Cyan #22D3EE (refined in the UX audit) */
+  --color-brand-100: #dfe1fd;
+  --color-brand-300: #a2a5f7;
+  --color-brand-400: #8184f3;
+  --color-brand-500: #5b5ff0;
+  --color-brand: #5b5ff0;
+  --color-brand-700: #3d3fc4;
+
+  --color-accent-300: #67e8f9;
+  --color-accent-400: #22d3ee;
+  --color-accent: #22d3ee;
+  --color-accent-600: #0891b2;
+
+  --color-violet: #8b5cf6;
+
+  /* Canvas — blue-biased near-black, never pure #000 (OLED smear) */
+  --color-ink: #080b16;
+  --color-ink-elevated: #0b0f1e;
+
+  /* Text */
+  --color-muted: #b8c0cc;
+
+  /* Semantic */
+  --color-ok: #34d399;
+  --color-warn: #fbbf24;
+  --color-bad: #fb7185;
+
+  /* Type — SF Pro Display is used natively on Apple hardware, Manrope elsewhere */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "SF Pro Display", -apple-system, BlinkMacSystemFont, var(--font-manrope),
+    var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Radii — glass wants generous, consistent corners */
+  --radius-glass: 1.5rem;
+  --radius-glass-lg: 2rem;
+  --radius-pill: 999px;
+
+  /* Easing — one curve family keeps 23 sections feeling like one product */
+  --ease-glass: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Breakpoint for very large displays */
+  --breakpoint-3xl: 108rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Layer 0b — runtime tokens (theme-swappable, read by the glass components)
+   ------------------------------------------------------------------------ */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page-bg: #080b16;
+  --page-fg: #f4f6ff;
+  --page-fg-muted: #9aa4bd;
+
+  /* Surfaces, exactly as specified in the brief */
+  --surface: rgba(255, 255, 255, 0.04);
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-bg-strong: rgba(255, 255, 255, 0.11);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-strong: rgba(255, 255, 255, 0.2);
+
+  /* The sheen that sells the "liquid" part: a light source above the card */
+  --glass-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.04) 22%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  --glass-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.09) inset,
+    0 -1px 0 0 rgba(0, 0, 0, 0.28) inset, 0 24px 60px -24px rgba(2, 4, 18, 0.9),
+    0 8px 24px -12px rgba(2, 4, 18, 0.7);
+
+  --blur-glass: 30px;
+  --noise-opacity: 0.038;
+  --aurora-opacity: 1;
+  --grid-line: rgba(255, 255, 255, 0.045);
+}
+
+/* Light theme keeps the same geometry — only the light source flips.
+   Preserves the existing site's theme toggle rather than dropping it. */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --page-bg: #f4f6fb;
+  --page-fg: #0a0f24;
+  --page-fg-muted: #4a5468;
+
+  --surface: rgba(255, 255, 255, 0.55);
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-bg-strong: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(10, 15, 36, 0.09);
+  --glass-border-strong: rgba(10, 15, 36, 0.16);
+
+  --glass-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.35) 26%,
+    rgba(255, 255, 255, 0) 62%
+  );
+  --glass-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
+    0 20px 44px -22px rgba(19, 26, 56, 0.28), 0 6px 18px -10px rgba(19, 26, 56, 0.18);
+
+  --noise-opacity: 0.025;
+  --aurora-opacity: 0.55;
+  --grid-line: rgba(10, 15, 36, 0.05);
+}
+
+/* ---------------------------------------------------------------------------
+   Layer 1 — base
+   ------------------------------------------------------------------------ */
+@layer base {
+  * {
+    border-color: var(--glass-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Sticky navbar is 4.5rem tall; anchors must clear it. */
+    scroll-padding-top: 6.5rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--page-bg);
+    color: var(--page-fg);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+
+  /* Display face + optical tightening. Large type needs negative tracking to
+     read as one shape rather than a row of letters. */
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Visible, on-brand focus ring — never remove the outline, restyle it. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-brand) 55%, transparent);
+    color: #fff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--page-fg) 14%, transparent);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--page-fg) 26%, transparent);
+    background-clip: content-box;
+  }
+
+  /* Native controls need explicit theming or they render as OS chrome. */
+  select option {
+    background: #0b1020;
+    color: #fff;
+  }
+
+  input[type="range"] {
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      var(--color-brand) 0%,
+      var(--color-accent) var(--range-progress, 50%),
+      color-mix(in oklab, var(--page-fg) 12%, transparent) var(--range-progress, 50%)
+    );
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #fff;
+    border: 2px solid var(--color-accent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent) 22%, transparent),
+      0 4px 12px rgba(0, 0, 0, 0.4);
+    cursor: grab;
+    transition: transform 0.18s var(--ease-spring), box-shadow 0.18s ease;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.18);
+  }
+  input[type="range"]::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(0.94);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: #fff;
+    border: 2px solid var(--color-accent);
+    cursor: grab;
+  }
+
+  /* Chrome/Safari strip number spinners so the glass fields stay symmetrical. */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Layer 2 — glass components
+   ------------------------------------------------------------------------ */
+@layer components {
+  /* The primitive. Every card, panel, pill and field is built on this. */
+  .glass {
+    position: relative;
+    background-color: var(--glass-bg);
+    backdrop-filter: blur(var(--blur-glass)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    isolation: isolate;
+  }
+
+  .glass-subtle {
+    background-color: var(--surface);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-strong {
+    background-color: var(--glass-bg-strong);
+    backdrop-filter: blur(40px) saturate(190%);
+    -webkit-backdrop-filter: blur(40px) saturate(190%);
+    border: 1px solid var(--glass-border-strong);
+    box-shadow: var(--glass-shadow);
+  }
+
+  /* Specular highlight along the top edge — the single detail that reads as
+     "real glass" rather than "translucent div". */
+  .glass-sheen::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--glass-sheen);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* 1px gradient border drawn with a mask so the fill stays transparent. */
+  .gradient-ring::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--color-violet) 85%, transparent) 0%,
+      color-mix(in oklab, var(--color-brand) 70%, transparent) 40%,
+      color-mix(in oklab, var(--color-accent) 85%, transparent) 100%
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.45s var(--ease-glass);
+    pointer-events: none;
+  }
+  .gradient-ring:hover::after,
+  .gradient-ring:focus-within::after,
+  .gradient-ring[data-active="true"]::after {
+    opacity: 1;
+  }
+  .gradient-ring-always::after {
+    opacity: 1;
+  }
+
+  /* Cursor-following spotlight. `--mx`/`--my` are written by useSpotlight. */
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      340px circle at var(--mx, 50%) var(--my, 0%),
+      color-mix(in oklab, var(--color-accent) 20%, transparent),
+      transparent 62%
+    );
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-glass);
+    pointer-events: none;
+    z-index: -1;
+  }
+  .spotlight:hover::before {
+    opacity: 1;
+  }
+
+  /* Purple → cyan text fill, per the brief's highlight rule. */
+  .text-gradient {
+    background-image: linear-gradient(
+      120deg,
+      #c4b5fd 0%,
+      var(--color-brand-400) 28%,
+      var(--color-accent-400) 62%,
+      #a5f3fc 100%
+    );
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradient-pan 9s linear infinite;
+  }
+
+  .text-gradient-static {
+    background-image: linear-gradient(120deg, var(--color-brand-400), var(--color-accent-400));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Soft brand bloom behind hero art and primary CTAs. */
+  .glow-brand {
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-brand) 40%, transparent),
+      0 10px 40px -12px color-mix(in oklab, var(--color-brand) 65%, transparent),
+      0 2px 10px -2px color-mix(in oklab, var(--color-accent) 40%, transparent);
+  }
+
+  /* Film grain. Pure CSS — no image request, no layout cost. */
+  .noise-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: var(--noise-opacity);
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Faint technical grid, VisionOS-style depth cue. */
+  .grid-overlay {
+    background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
+  }
+
+  /* Section rhythm — one source of truth for vertical spacing. */
+  .section-shell {
+    position: relative;
+    padding-block: clamp(5rem, 9vw, 9.5rem);
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 82rem;
+    margin-inline: auto;
+    padding-inline: clamp(1.15rem, 4vw, 2.5rem);
+  }
+
+  /* Hairline divider that fades at both ends. */
+  .rule-fade {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--page-fg) 14%, transparent) 20%,
+      color-mix(in oklab, var(--color-accent) 32%, transparent) 50%,
+      color-mix(in oklab, var(--page-fg) 14%, transparent) 80%,
+      transparent
+    );
+  }
+
+  /* Numeric readouts must not jitter as digits change. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Layer 3 — ambient keyframes (compositor-only: transform / opacity / filter)
+   ------------------------------------------------------------------------ */
+@keyframes gradient-pan {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes blob-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(6%, -8%, 0) scale(1.12);
+  }
+  66% {
+    transform: translate3d(-7%, 5%, 0) scale(0.94);
+  }
+}
+
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -12px, 0);
+  }
+}
+
+@keyframes marquee-x {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes sheen-sweep {
+  0% {
+    transform: translate3d(-140%, 0, 0) skewX(-18deg);
+  }
+  100% {
+    transform: translate3d(240%, 0, 0) skewX(-18deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+@keyframes caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0;
+  }
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@layer utilities {
+  .animate-blob {
+    animation: blob-drift 24s var(--ease-glass) infinite;
+    will-change: transform;
+  }
+  .animate-float {
+    animation: float-y 7s ease-in-out infinite;
+    will-change: transform;
+  }
+  .animate-marquee {
+    animation: marquee-x var(--marquee-duration, 46s) linear infinite;
+    will-change: transform;
+  }
+  .animate-sheen {
+    animation: sheen-sweep 1.15s var(--ease-out-expo);
+  }
+  .animate-pulse-ring {
+    animation: pulse-ring 2.4s var(--ease-out-expo) infinite;
+  }
+  .animate-caret {
+    animation: caret-blink 1.1s steps(1) infinite;
+  }
+  .animate-spin-slow {
+    animation: spin-slow 18s linear infinite;
+  }
+
+  /* Marquees pause on hover so users can actually read a card. */
+  .pause-on-hover:hover .animate-marquee {
+    animation-play-state: paused;
+  }
+
+  /* Promote elements we know will transform, without leaving layers around. */
+  .gpu {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Accessibility — honour the OS "reduce motion" switch everywhere at once.
+   Framer Motion reads the same signal via usePrefersReducedMotion.
+   ------------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* backdrop-filter is expensive on low-end GPUs; drop to an opaque fill when the
+   browser tells us it cannot support it. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-subtle,
+  .glass-strong {
+    background-color: color-mix(in oklab, var(--page-bg) 82%, var(--page-fg) 8%);
+  }
+}

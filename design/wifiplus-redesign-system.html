@@ -1,0 +1,1109 @@
+<title>WifiPlus — UX Audit & Premium Redesign System</title>
+<meta name="description" content="Full UX audit, design system, and premium SaaS redesign specification for WifiPlus.">
+
+<style>
+  /* =====================================================================
+     TOKENS  —  this token layer *is* the design system being documented.
+     Dark is the designed-primary (the product's DB profile is "Dark Mode
+     Primary; light is the exception"), so :root carries dark and light is
+     a deliberate, fully-crafted override — not a naive inversion.
+     ===================================================================== */
+  :root {
+    color-scheme: dark;
+
+    /* ground — blue-biased near-black, never pure #000 (OLED smear) */
+    --bg: #080b16;
+    --bg-2: #0b0f1e;
+    --surface: rgba(255,255,255,0.035);
+    --surface-2: rgba(255,255,255,0.055);
+    --card: rgba(255,255,255,0.06);
+    --card-hover: rgba(255,255,255,0.09);
+    --border: rgba(255,255,255,0.10);
+    --border-strong: rgba(255,255,255,0.18);
+
+    /* text — bias muted toward the brand hue so grey reads "chosen" */
+    --fg: #f4f6ff;
+    --fg-muted: #9aa4bd;
+    --fg-faint: #6b7492;
+
+    /* brand ramp — Signal Indigo */
+    --brand-50:#eef0fe; --brand-100:#dfe1fd; --brand-200:#c3c6fb; --brand-300:#a2a5f7;
+    --brand-400:#8184f3; --brand-500:#5b5ff0; --brand:#5b5ff0; --brand-600:#4a4ce2; --brand-700:#3d3fc4;
+
+    /* accents */
+    --cyan:#22d3ee; --cyan-soft:#67e8f9;
+    --violet:#8b5cf6; --violet-soft:#a78bfa;
+
+    /* semantic — separate from the accent hue */
+    --success:#34d399; --success-bg:rgba(52,211,153,0.14);
+    --warning:#fbbf24; --warning-bg:rgba(251,191,36,0.14);
+    --error:#fb7185;   --error-bg:rgba(251,113,133,0.14);
+    --info:#38bdf8;    --info-bg:rgba(56,189,248,0.14);
+
+    /* the one signal gradient — the product's core metaphor */
+    --grad: linear-gradient(120deg,#8b5cf6 0%,#5b5ff0 46%,#22d3ee 100%);
+    --grad-soft: linear-gradient(120deg,rgba(139,92,246,.22),rgba(34,211,238,.22));
+
+    /* radius — a considered scale, not rounded-lg everywhere */
+    --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:20px; --r-xl:28px; --r-pill:999px;
+
+    /* 8pt spacing */
+    --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px; --s-8:64px; --s-9:96px;
+
+    /* elevation */
+    --sh-sm: 0 1px 2px rgba(2,4,12,.5);
+    --sh-md: 0 6px 20px -8px rgba(2,4,12,.7);
+    --sh-lg: 0 20px 44px -20px rgba(2,4,12,.85);
+    --sh-xl: 0 36px 80px -32px rgba(2,4,12,.9);
+    --glow: 0 0 0 1px rgba(91,95,240,.35), 0 12px 40px -12px rgba(91,95,240,.55);
+
+    /* glass */
+    --glass-bg: rgba(255,255,255,0.06);
+    --glass-blur: 22px;
+    --sheen: linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,0) 42%);
+
+    /* type — Inter is the documented product face (per brief); the artifact
+       renders in a matched system stack since the CSP blocks font CDNs. */
+    --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
+
+    --grid-line: rgba(255,255,255,0.04);
+    --scrim: rgba(6,8,18,.72);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) { --light: 1; }
+  }
+
+  /* light overrides — applied by prefers-color-scheme OR explicit toggle.
+     Duplicated as a token block so components never branch on theme. */
+  :root[data-theme="light"], :root.is-light {
+    color-scheme: light;
+    --bg:#f5f7fc; --bg-2:#eef1f8;
+    --surface: rgba(12,16,32,0.025);
+    --surface-2: rgba(12,16,32,0.04);
+    --card:#ffffff; --card-hover:#ffffff;
+    --border: rgba(12,16,32,0.10); --border-strong: rgba(12,16,32,0.18);
+    --fg:#0c1020; --fg-muted:#525c73; --fg-faint:#8a93a8;
+    --sh-sm:0 1px 2px rgba(19,26,56,.08);
+    --sh-md:0 8px 24px -12px rgba(19,26,56,.18);
+    --sh-lg:0 22px 46px -22px rgba(19,26,56,.22);
+    --sh-xl:0 36px 80px -34px rgba(19,26,56,.26);
+    --glow:0 0 0 1px rgba(91,95,240,.28), 0 14px 40px -14px rgba(91,95,240,.4);
+    --glass-bg: rgba(255,255,255,0.65);
+    --sheen: linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,0) 46%);
+    --grid-line: rgba(12,16,32,0.05);
+    --scrim: rgba(255,255,255,.7);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 92px; -webkit-text-size-adjust: 100%; }
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} *{animation-duration:.001ms!important;transition-duration:.001ms!important;} }
+
+  body {
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:var(--font); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+  }
+
+  /* ambient background — subtle aurora + grid, fixed, non-interactive */
+  .aura { position:fixed; inset:0; z-index:-2; pointer-events:none; overflow:hidden; }
+  .aura::before{ content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(50rem 40rem at 8% -6%, rgba(139,92,246,.20), transparent 60%),
+      radial-gradient(46rem 40rem at 96% 4%, rgba(34,211,238,.16), transparent 60%),
+      radial-gradient(50rem 44rem at 50% 116%, rgba(91,95,240,.16), transparent 62%);
+  }
+  .aura::after{ content:""; position:absolute; inset:0;
+    background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+    background-size:56px 56px; mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 30%,transparent 78%); }
+
+  /* ---- layout shell ---------------------------------------------------- */
+  .shell { display:grid; grid-template-columns:260px minmax(0,1fr); gap:0; max-width:1400px; margin:0 auto; }
+  .sidebar { position:sticky; top:0; align-self:start; height:100vh; padding:26px 18px 26px 28px;
+    display:flex; flex-direction:column; gap:18px; overflow-y:auto; }
+  .content { min-width:0; padding:0 clamp(20px,4vw,64px) 120px; }
+
+  .brand-row{ display:flex; align-items:center; gap:11px; }
+  .logo{ width:38px; height:38px; border-radius:11px; background:var(--grad); display:grid; place-items:center; box-shadow:var(--glow); flex:none; }
+  .logo svg{ width:21px; height:21px; }
+  .brand-name{ font-weight:800; letter-spacing:-.02em; font-size:16px; }
+  .brand-sub{ font-size:11px; color:var(--fg-faint); letter-spacing:.04em; }
+
+  nav.toc{ display:flex; flex-direction:column; gap:1px; margin-top:4px; }
+  nav.toc a{ display:flex; gap:11px; align-items:baseline; padding:8px 11px; border-radius:9px;
+    color:var(--fg-muted); text-decoration:none; font-size:13.5px; line-height:1.3; transition:background .2s,color .2s; }
+  nav.toc a .num{ font-size:11px; color:var(--fg-faint); font-variant-numeric:tabular-nums; width:20px; flex:none; }
+  nav.toc a:hover{ background:var(--surface); color:var(--fg); }
+  nav.toc a.active{ background:var(--surface-2); color:var(--fg); }
+  nav.toc a.active .num{ color:var(--cyan); }
+
+  .side-foot{ margin-top:auto; font-size:11px; color:var(--fg-faint); line-height:1.5; }
+
+  /* ---- top bar (mobile) ------------------------------------------------ */
+  .topbar{ display:none; position:sticky; top:0; z-index:40; align-items:center; gap:12px;
+    padding:12px 16px; background:var(--scrim); backdrop-filter:blur(16px); border-bottom:1px solid var(--border); }
+  .menu-btn{ margin-left:auto; }
+
+  /* ---- shared bits ----------------------------------------------------- */
+  .btn{ font-family:inherit; cursor:pointer; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--fg); border-radius:var(--r-pill); padding:8px 14px; font-size:13px; font-weight:600;
+    display:inline-flex; align-items:center; gap:7px; transition:transform .2s,background .2s,box-shadow .2s; }
+  .btn:hover{ transform:translateY(-1px); background:var(--card-hover); }
+  .btn:focus-visible,a:focus-visible,button:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
+  .btn-grad{ background:var(--grad); border:none; color:#fff; box-shadow:0 10px 28px -10px rgba(91,95,240,.8); }
+  .btn-grad:hover{ box-shadow:0 16px 40px -12px rgba(34,211,238,.7); }
+
+  section{ padding-top:88px; }
+  .eyebrow{ display:inline-flex; align-items:center; gap:8px; font-size:11px; font-weight:700;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--fg-muted);
+    padding:6px 12px; border:1px solid var(--border); border-radius:var(--r-pill); background:var(--surface); }
+  .eyebrow .dot{ width:6px;height:6px;border-radius:50%; background:var(--grad); box-shadow:0 0 8px 1px rgba(34,211,238,.6); }
+  h1,h2,h3,h4{ letter-spacing:-.03em; text-wrap:balance; margin:0; line-height:1.06; font-weight:800; }
+  h2.title{ font-size:clamp(28px,4vw,44px); margin:16px 0 10px; }
+  h3.sub{ font-size:clamp(19px,2.4vw,24px); margin:44px 0 14px; letter-spacing:-.02em; }
+  h4{ font-size:16px; letter-spacing:-.01em; }
+  .lead{ color:var(--fg-muted); font-size:clamp(15px,1.5vw,17px); max-width:64ch; line-height:1.65; }
+  .muted{ color:var(--fg-muted); } .faint{ color:var(--fg-faint); }
+  .mono{ font-family:var(--mono); font-variant-numeric:tabular-nums; }
+  .tnum{ font-variant-numeric:tabular-nums; }
+  a.inline{ color:var(--cyan); text-decoration:none; border-bottom:1px solid transparent; }
+  a.inline:hover{ border-color:var(--cyan); }
+
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--r-lg); box-shadow:var(--sh-md); }
+  .glass{ background:var(--glass-bg); backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%); border:1px solid var(--border); position:relative; }
+  .glass::before{ content:""; position:absolute; inset:0; border-radius:inherit; background:var(--sheen); pointer-events:none; }
+
+  .grid{ display:grid; gap:16px; }
+  .divider{ height:1px; background:linear-gradient(90deg,transparent,var(--border-strong),transparent); margin:56px 0; border:0; }
+
+  /* ---- HERO ------------------------------------------------------------ */
+  .hero{ padding:72px 0 8px; }
+  .hero h1{ font-size:clamp(34px,6vw,66px); letter-spacing:-.04em; margin:22px 0 0; }
+  .hero h1 .grad{ background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero .lead{ margin-top:20px; font-size:clamp(16px,1.8vw,19px); max-width:60ch; }
+  .hero-meta{ display:flex; flex-wrap:wrap; gap:10px; margin-top:26px; }
+  .chip{ display:inline-flex; align-items:center; gap:7px; font-size:12.5px; padding:7px 12px; border-radius:var(--r-pill);
+    border:1px solid var(--border); background:var(--surface); color:var(--fg-muted); }
+  .chip b{ color:var(--fg); font-weight:700; }
+
+  .score-hero{ display:flex; flex-wrap:wrap; gap:28px; align-items:center; margin-top:40px;
+    padding:26px; border-radius:var(--r-xl); }
+  .gauge{ --v:53; position:relative; width:150px; height:150px; flex:none; }
+  .gauge svg{ transform:rotate(-90deg); }
+  .gauge .val{ position:absolute; inset:0; display:grid; place-content:center; text-align:center; }
+  .gauge .val b{ font-size:38px; font-weight:800; letter-spacing:-.03em; }
+  .gauge .val span{ display:block; font-size:11px; color:var(--fg-muted); letter-spacing:.1em; text-transform:uppercase; }
+  .verdict{ min-width:min(100%,340px); flex:1; }
+  .verdict h4{ font-size:20px; margin-bottom:8px; }
+
+  /* ---- SCORECARD ------------------------------------------------------- */
+  .score-groups{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; }
+  .score-block{ padding:20px 22px; }
+  .score-block h4{ display:flex; align-items:center; gap:9px; margin-bottom:16px; font-size:13px;
+    text-transform:uppercase; letter-spacing:.1em; color:var(--fg-muted); }
+  .score-block h4 .avg{ margin-left:auto; font-size:13px; color:var(--fg); font-weight:800; }
+  .row{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; align-items:center; padding:9px 0; border-top:1px solid var(--border); }
+  .row:first-of-type{ border-top:0; }
+  .row .name{ font-size:13.5px; font-weight:600; }
+  .row .why{ grid-column:1/-1; font-size:12px; color:var(--fg-muted); line-height:1.45; margin-top:-2px; }
+  .bar{ width:120px; height:7px; border-radius:99px; background:var(--surface-2); overflow:hidden; position:relative; }
+  .bar > i{ position:absolute; inset:0 auto 0 0; width:var(--w,0%); border-radius:99px; background:var(--grad);
+    transition:width 1s cubic-bezier(.16,1,.3,1); }
+  .bar.b-low > i{ background:linear-gradient(90deg,#fb7185,#f59e0b); }
+  .bar.b-mid > i{ background:linear-gradient(90deg,#f59e0b,#5b5ff0); }
+  .sc{ font-size:13px; font-weight:800; width:38px; text-align:right; font-variant-numeric:tabular-nums; }
+
+  /* ---- problems -------------------------------------------------------- */
+  .prob{ display:grid; grid-template-columns:auto 1fr; gap:14px; padding:16px 18px; align-items:start; }
+  .sev{ font-size:10.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; padding:5px 9px;
+    border-radius:var(--r-sm); white-space:nowrap; align-self:start; }
+  .sev.crit{ background:var(--error-bg); color:var(--error); }
+  .sev.high{ background:var(--warning-bg); color:var(--warning); }
+  .sev.med{ background:var(--info-bg); color:var(--info); }
+  .prob h4{ font-size:15px; margin-bottom:4px; }
+  .prob p{ margin:0; font-size:13px; color:var(--fg-muted); line-height:1.5; }
+  .prob .fix{ color:var(--success); }
+
+  /* ---- swatches -------------------------------------------------------- */
+  .swatches{ display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:10px; }
+  .sw{ border-radius:var(--r-md); overflow:hidden; border:1px solid var(--border); background:var(--card); }
+  .sw .chipc{ height:64px; } .sw .meta{ padding:8px 10px; }
+  .sw .meta b{ font-size:12px; display:block; } .sw .meta code{ font-size:10.5px; color:var(--fg-muted); font-family:var(--mono); }
+  .ramp{ display:flex; border-radius:var(--r-md); overflow:hidden; border:1px solid var(--border); }
+  .ramp > div{ flex:1; height:52px; display:grid; place-items:end center; padding-bottom:5px; font-size:9.5px; font-family:var(--mono); }
+
+  /* ---- type specimen --------------------------------------------------- */
+  .type-row{ display:grid; grid-template-columns:110px 1fr; gap:16px; align-items:baseline; padding:14px 0; border-top:1px solid var(--border); }
+  .type-row .spec{ font-size:11px; color:var(--fg-muted); font-family:var(--mono); }
+  .type-row .demo{ letter-spacing:-.02em; }
+
+  /* ---- spacing scale --------------------------------------------------- */
+  .space-row{ display:flex; align-items:center; gap:14px; padding:7px 0; }
+  .space-row .lab{ width:80px; font-size:12px; font-family:var(--mono); color:var(--fg-muted); }
+  .space-row .bx{ height:16px; background:var(--grad); border-radius:4px; }
+
+  /* ---- component demos ------------------------------------------------- */
+  .demowrap{ padding:22px; }
+  .demo-grid{ display:grid; gap:22px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); align-items:start; }
+  .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+  .field label{ font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--fg-muted); }
+  .input{ background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-md);
+    padding:11px 13px; color:var(--fg); font-family:inherit; font-size:14px; }
+  .input:focus{ outline:none; border-color:var(--brand); box-shadow:0 0 0 3px rgba(91,95,240,.28); }
+  .input.err{ border-color:var(--error); box-shadow:0 0 0 3px var(--error-bg); }
+  .hint.err{ font-size:11.5px; color:var(--error); }
+  .badges{ display:flex; flex-wrap:wrap; gap:8px; }
+  .bdg{ font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:var(--r-pill); border:1px solid var(--border); }
+  .bdg.br{ color:var(--brand-300); background:rgba(91,95,240,.14); border-color:rgba(91,95,240,.3); }
+  .bdg.su{ color:var(--success); background:var(--success-bg); }
+  .bdg.wa{ color:var(--warning); background:var(--warning-bg); }
+  .bdg.er{ color:var(--error); background:var(--error-bg); }
+
+  /* ---- pricing --------------------------------------------------------- */
+  .price-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+  .plan{ padding:24px; position:relative; }
+  .plan.feat{ box-shadow:var(--glow); }
+  .plan .tag{ position:absolute; top:-11px; left:24px; font-size:10.5px; font-weight:800; letter-spacing:.08em;
+    text-transform:uppercase; padding:5px 11px; border-radius:var(--r-pill); background:var(--grad); color:#fff; }
+  .plan .pname{ font-size:14px; font-weight:700; color:var(--fg-muted); }
+  .plan .amt{ font-size:40px; font-weight:800; letter-spacing:-.03em; margin:8px 0 2px; }
+  .plan ul{ list-style:none; padding:0; margin:16px 0 20px; display:flex; flex-direction:column; gap:9px; }
+  .plan li{ font-size:13px; color:var(--fg-muted); display:flex; gap:9px; align-items:flex-start; }
+  .plan li svg{ flex:none; margin-top:2px; color:var(--success); }
+
+  /* ---- dashboard mock -------------------------------------------------- */
+  .dash{ border-radius:var(--r-xl); overflow:hidden; border:1px solid var(--border); box-shadow:var(--sh-lg); }
+  .dash-top{ display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--surface); }
+  .dot3{ display:flex; gap:6px; } .dot3 i{ width:10px;height:10px;border-radius:50%; background:var(--border-strong); }
+  .dash-body{ display:grid; grid-template-columns:180px 1fr; min-height:300px; }
+  .dnav{ padding:16px 12px; border-right:1px solid var(--border); background:var(--surface); display:flex; flex-direction:column; gap:4px; }
+  .dnav a{ font-size:12.5px; color:var(--fg-muted); padding:8px 10px; border-radius:9px; text-decoration:none; display:flex; gap:9px; align-items:center; }
+  .dnav a.on{ background:var(--surface-2); color:var(--fg); }
+  .dnav a .ic{ width:15px; height:15px; border-radius:5px; background:var(--grad); opacity:.85; flex:none; }
+  .dmain{ padding:18px; }
+  .stat-row{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; }
+  .stat{ padding:12px 14px; border-radius:var(--r-md); background:var(--surface-2); border:1px solid var(--border); }
+  .stat .k{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--fg-muted); }
+  .stat .v{ font-size:24px; font-weight:800; letter-spacing:-.02em; margin-top:3px; }
+  .stat .v small{ font-size:12px; color:var(--fg-muted); font-weight:600; }
+  .trend{ font-size:11px; color:var(--success); }
+
+  /* ---- auth mock ------------------------------------------------------- */
+  .auth{ max-width:380px; margin:0 auto; padding:28px; }
+
+  /* ---- tables & code --------------------------------------------------- */
+  .tablewrap{ overflow-x:auto; border-radius:var(--r-md); border:1px solid var(--border); }
+  table{ border-collapse:collapse; width:100%; font-size:13px; min-width:520px; }
+  th,td{ text-align:left; padding:11px 14px; border-top:1px solid var(--border); }
+  th{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--fg-muted); background:var(--surface); border-top:0; }
+  td.tnum{ text-align:right; }
+  pre{ margin:0; overflow-x:auto; background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r-md);
+    padding:16px; font-family:var(--mono); font-size:12.5px; line-height:1.65; color:var(--fg); }
+  pre .c{ color:var(--fg-faint); } pre .k{ color:var(--violet-soft); } pre .s{ color:var(--cyan-soft); } pre .n{ color:var(--success); }
+  .codegrid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); }
+
+  /* ---- interaction spec ------------------------------------------------ */
+  .ix{ padding:16px 18px; }
+  .ix h4{ font-size:14px; margin-bottom:5px; }
+  .ix p{ margin:0 0 8px; font-size:13px; color:var(--fg-muted); }
+  .ix .spec-line{ font-size:11.5px; font-family:var(--mono); color:var(--cyan); }
+
+  /* ---- deliverables ---------------------------------------------------- */
+  .deliv{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
+  .deliv .d{ padding:14px 16px; display:flex; gap:11px; align-items:flex-start; }
+  .deliv .d .n{ font-size:12px; font-weight:800; color:var(--cyan); font-variant-numeric:tabular-nums; }
+  .deliv .d b{ font-size:13.5px; } .deliv .d p{ margin:2px 0 0; font-size:12px; color:var(--fg-muted); }
+
+  .callout{ padding:16px 18px; border-left:3px solid var(--brand); background:var(--surface); border-radius:0 var(--r-md) var(--r-md) 0; }
+  .grid-2{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+  .list-check{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:9px; }
+  .list-check li{ display:flex; gap:10px; font-size:14px; color:var(--fg-muted); align-items:flex-start; }
+  .list-check li svg{ flex:none; margin-top:3px; color:var(--cyan); }
+
+  .theme-toggle{ display:inline-flex; align-items:center; gap:7px; }
+
+  /* ---- responsive ------------------------------------------------------ */
+  @media (max-width:940px){
+    .shell{ grid-template-columns:1fr; }
+    .sidebar{ display:none; }
+    .topbar{ display:flex; }
+    .content{ padding:0 20px 96px; }
+    section{ padding-top:64px; }
+    .hero{ padding:36px 0 0; }
+  }
+  @media (max-width:560px){
+    .gauge{ width:120px; height:120px; }
+    h2.title{ font-size:26px; }
+  }
+
+  /* off-canvas mobile nav */
+  .drawer{ position:fixed; inset:0; z-index:60; display:none; }
+  .drawer.open{ display:block; }
+  .drawer .scrim{ position:absolute; inset:0; background:var(--scrim); backdrop-filter:blur(6px); }
+  .drawer .panel{ position:absolute; top:0; left:0; bottom:0; width:270px; background:var(--bg-2);
+    border-right:1px solid var(--border); padding:22px 16px; overflow-y:auto; }
+</style>
+
+<div class="aura" aria-hidden="true"></div>
+
+<!-- mobile top bar -->
+<header class="topbar">
+  <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M2.6 9.2a15 15 0 0 1 18.8 0" opacity=".55"/><path d="M5.7 12.6a10.2 10.2 0 0 1 12.6 0" opacity=".8"/><path d="M8.8 16a5.4 5.4 0 0 1 6.4 0"/><circle cx="12" cy="19.4" r="1.2" fill="#fff" stroke="none"/></svg></span>
+  <b style="letter-spacing:-.02em">WifiPlus Redesign</b>
+  <button class="btn menu-btn" id="menuBtn" aria-label="Open contents">Contents</button>
+</header>
+
+<div class="drawer" id="drawer" aria-hidden="true">
+  <div class="scrim" data-close></div>
+  <div class="panel" id="drawerNav"></div>
+</div>
+
+<div class="shell">
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar">
+    <div class="brand-row">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M2.6 9.2a15 15 0 0 1 18.8 0" opacity=".55"/><path d="M5.7 12.6a10.2 10.2 0 0 1 12.6 0" opacity=".8"/><path d="M8.8 16a5.4 5.4 0 0 1 6.4 0"/><circle cx="12" cy="19.4" r="1.2" fill="#fff" stroke="none"/></svg></span>
+      <div><div class="brand-name">WifiPlus</div><div class="brand-sub">Audit &amp; Redesign System</div></div>
+    </div>
+    <button class="btn theme-toggle" id="themeBtn" aria-label="Toggle theme">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      <span id="themeLabel">Light</span>
+    </button>
+    <nav class="toc" id="toc"></nav>
+    <div class="side-foot">
+      Audited <span class="tnum">wifiplus.prathamgosai.in</span><br>
+      Product design deliverable · 2026
+    </div>
+  </aside>
+
+  <!-- ===================== CONTENT ===================== -->
+  <main class="content">
+
+    <!-- HERO -->
+    <section id="overview" class="hero">
+      <span class="eyebrow"><span class="dot"></span> UX Audit → Design System → Redesign</span>
+      <h1>WifiPlus, re-engineered into a<br><span class="grad">premium product experience.</span></h1>
+      <p class="lead">A full 12-phase teardown of the live site, followed by an original design system and screen-by-screen redesign spec — built to sit next to Stripe, Linear and Vercel without flinching. The current build is an honest, capable prototype; this is the plan that turns it into a product people trust on sight.</p>
+      <div class="hero-meta">
+        <span class="chip"><b>33</b> categories scored</span>
+        <span class="chip"><b>18</b> UX problems triaged</span>
+        <span class="chip"><b>6</b> screens redesigned</span>
+        <span class="chip"><b>WCAG AA+</b> targeted</span>
+        <span class="chip"><b>Inter</b> · 8pt grid · dark-primary</span>
+      </div>
+
+      <div class="score-hero glass card">
+        <div class="gauge" id="gauge" style="--v:53">
+          <svg width="150" height="150" viewBox="0 0 150 150">
+            <circle cx="75" cy="75" r="64" fill="none" stroke="var(--surface-2)" stroke-width="12"/>
+            <circle id="gaugeArc" cx="75" cy="75" r="64" fill="none" stroke="url(#gg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="402" stroke-dashoffset="402"/>
+            <defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset=".5" stop-color="#5b5ff0"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+          </svg>
+          <div class="val"><b class="tnum">5.3</b><span>Current /10</span></div>
+        </div>
+        <div class="verdict">
+          <h4>Verdict: capable prototype, not yet a product</h4>
+          <p class="muted">The engineering is real — the speed test measures live bytes, accessibility basics are present, and the CSP is genuinely strong. But the surface reads like a developer's pitch deck: dense text, a flat card rhythm, weak hierarchy, disclaimer-heavy copy that dents trust, and no conversion path. Target after redesign: <b style="color:var(--fg)">9.1/10</b>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 1 -->
+    <section id="p1">
+      <span class="eyebrow"><span class="dot"></span> Phase 1</span>
+      <h2 class="title">Full UX &amp; UI Audit</h2>
+      <p class="lead">Every category scored 1–10 with the reason. Scores reflect the live site as shipped, not the target. Grouped by concern; each group carries its own average.</p>
+      <div class="score-groups" id="scoreGroups" style="margin-top:28px"></div>
+    </section>
+
+    <!-- PHASE 2 -->
+    <section id="p2">
+      <span class="eyebrow"><span class="dot"></span> Phase 2</span>
+      <h2 class="title">UX Problems, triaged</h2>
+      <p class="lead">Ordered by severity and conversion impact. Each pairs the problem with the fix the redesign applies.</p>
+      <div class="grid" id="problems" style="margin-top:26px"></div>
+    </section>
+
+    <!-- PHASE 3 -->
+    <section id="p3">
+      <span class="eyebrow"><span class="dot"></span> Phase 3</span>
+      <h2 class="title">Design Strategy</h2>
+      <p class="lead">One thesis: <b style="color:var(--fg)">make the measurement the hero, make everything else quiet.</b> The product's magic is a real, live network reading — so the interface should feel like precision instrumentation, not a marketing site with a widget bolted on.</p>
+      <div class="grid-2" style="margin-top:26px">
+        <div class="card demowrap">
+          <h4>Principles</h4>
+          <ul class="list-check" style="margin-top:12px">
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Instrument, don't decorate.</b>&nbsp;Live numbers, sparklines, and state chips carry the page — motion serves meaning.</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>One decision per screen.</b>&nbsp;A single primary action, obvious at a glance; secondary paths recede.</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Earn trust with evidence.</b>&nbsp;Replace "sample data" apologies with methodology, real result cards, and honest labels.</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Space is a feature.</b>&nbsp;Halve the density; let the 8pt rhythm breathe so the eye lands where it should.</li>
+          </ul>
+        </div>
+        <div class="card demowrap">
+          <h4>Inspiration, mapped honestly</h4>
+          <div class="tablewrap" style="margin-top:12px;border:0">
+            <table>
+              <tbody>
+                <tr><td><b>Linear</b></td><td class="muted">Restraint, keyboard-grade precision, the calm dark surface</td></tr>
+                <tr><td><b>Stripe</b></td><td class="muted">Trust through clarity; docs-grade legibility; gradient used with discipline</td></tr>
+                <tr><td><b>Vercel</b></td><td class="muted">Monochrome base + one confident accent; sharp data tables</td></tr>
+                <tr><td><b>Arc / Raycast</b></td><td class="muted">Playful precision in micro-interactions; command-surface feel</td></tr>
+                <tr><td><b>Apple</b></td><td class="muted">The hero is a live demo, not a stock illustration; type does the work</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="faint" style="font-size:12px;margin:14px 0 0">Never copied — the signal-gradient identity and instrument-panel layout are specific to a network product.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 4 -->
+    <section id="p4">
+      <span class="eyebrow"><span class="dot"></span> Phase 4</span>
+      <h2 class="title">The Design System</h2>
+      <p class="lead">A production token system — the same variables that render this page. Dark is the designed-primary; light is a fully-crafted alternate. Try the toggle in the sidebar.</p>
+
+      <h3 class="sub">Color · brand ramp</h3>
+      <div class="ramp" style="margin-bottom:14px">
+        <div style="background:#eef0fe;color:#3d3fc4">50</div><div style="background:#dfe1fd;color:#3d3fc4">100</div>
+        <div style="background:#c3c6fb;color:#3d3fc4">200</div><div style="background:#a2a5f7;color:#1a1a3a">300</div>
+        <div style="background:#8184f3;color:#fff">400</div><div style="background:#5b5ff0;color:#fff">500</div>
+        <div style="background:#4a4ce2;color:#fff">600</div><div style="background:#3d3fc4;color:#fff">700</div>
+      </div>
+      <h3 class="sub" style="margin-top:26px">Color · roles</h3>
+      <div class="swatches">
+        <div class="sw"><div class="chipc" style="background:var(--grad)"></div><div class="meta"><b>Signal gradient</b><code>violet→indigo→cyan</code></div></div>
+        <div class="sw"><div class="chipc" style="background:#5b5ff0"></div><div class="meta"><b>Primary</b><code>#5B5FF0</code></div></div>
+        <div class="sw"><div class="chipc" style="background:#22d3ee"></div><div class="meta"><b>Accent</b><code>#22D3EE</code></div></div>
+        <div class="sw"><div class="chipc" style="background:#8b5cf6"></div><div class="meta"><b>Violet</b><code>#8B5CF6</code></div></div>
+        <div class="sw"><div class="chipc" style="background:#34d399"></div><div class="meta"><b>Success</b><code>#34D399</code></div></div>
+        <div class="sw"><div class="chipc" style="background:#fbbf24"></div><div class="meta"><b>Warning</b><code>#FBBF24</code></div></div>
+        <div class="sw"><div class="chipc" style="background:#fb7185"></div><div class="meta"><b>Error</b><code>#FB7185</code></div></div>
+        <div class="sw"><div class="chipc" style="background:#080b16;border-bottom:1px solid var(--border)"></div><div class="meta"><b>BG (dark)</b><code>#080B16</code></div></div>
+        <div class="sw"><div class="chipc" style="background:#f5f7fc"></div><div class="meta"><b>BG (light)</b><code>#F5F7FC</code></div></div>
+      </div>
+      <p class="faint" style="font-size:12px;margin-top:12px">Neutrals are blue-biased so grey reads as chosen, not default. Semantic colours are kept separate from the accent hue.</p>
+
+      <h3 class="sub">Typography · Inter</h3>
+      <div class="card demowrap">
+        <div class="type-row"><div class="spec">Display / 72 · 800 · -4%</div><div class="demo" style="font-size:clamp(34px,6vw,64px);font-weight:800">Test anywhere</div></div>
+        <div class="type-row"><div class="spec">H1 / 44 · 800</div><div class="demo" style="font-size:clamp(28px,4vw,40px);font-weight:800">Real speed, measured</div></div>
+        <div class="type-row"><div class="spec">H2 / 32 · 700</div><div class="demo" style="font-size:28px;font-weight:700">Global ISP intelligence</div></div>
+        <div class="type-row"><div class="spec">H3 / 24 · 700</div><div class="demo" style="font-size:22px;font-weight:700">Compare providers</div></div>
+        <div class="type-row"><div class="spec">Body / 16 · 400 · 1.6</div><div class="demo" style="font-size:16px;font-weight:400;letter-spacing:0">Download and upload throughput are measured from real bytes over parallel streams, with the ramp discarded.</div></div>
+        <div class="type-row"><div class="spec">Caption / 13 · 500</div><div class="demo muted" style="font-size:13px;letter-spacing:0">Median round-trip · lower is better</div></div>
+        <div class="type-row"><div class="spec">Label / 11 · 700 · +14%</div><div class="demo" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--fg-muted)">Download · Mbps</div></div>
+        <div class="type-row"><div class="spec">Data / tabular</div><div class="demo mono" style="font-size:28px;font-weight:800">942.7<span style="font-size:14px;color:var(--fg-muted)"> Mbps</span></div></div>
+      </div>
+
+      <div class="grid-2" style="margin-top:26px">
+        <div>
+          <h3 class="sub" style="margin-top:0">Spacing · 8pt grid</h3>
+          <div class="card demowrap">
+            <div class="space-row"><span class="lab">--s-1 · 4</span><span class="bx" style="width:4px"></span></div>
+            <div class="space-row"><span class="lab">--s-2 · 8</span><span class="bx" style="width:8px"></span></div>
+            <div class="space-row"><span class="lab">--s-3 · 12</span><span class="bx" style="width:12px"></span></div>
+            <div class="space-row"><span class="lab">--s-4 · 16</span><span class="bx" style="width:16px"></span></div>
+            <div class="space-row"><span class="lab">--s-5 · 24</span><span class="bx" style="width:24px"></span></div>
+            <div class="space-row"><span class="lab">--s-6 · 32</span><span class="bx" style="width:32px"></span></div>
+            <div class="space-row"><span class="lab">--s-7 · 48</span><span class="bx" style="width:48px"></span></div>
+            <div class="space-row"><span class="lab">--s-8 · 64</span><span class="bx" style="width:64px"></span></div>
+            <div class="space-row"><span class="lab">--s-9 · 96</span><span class="bx" style="width:96px"></span></div>
+          </div>
+        </div>
+        <div>
+          <h3 class="sub" style="margin-top:0">Radius &amp; elevation</h3>
+          <div class="card demowrap">
+            <div class="badges" style="gap:12px;margin-bottom:20px">
+              <span style="width:52px;height:44px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;display:grid;place-items:end center;font-size:9px;padding-bottom:3px" class="mono">6</span>
+              <span style="width:52px;height:44px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;display:grid;place-items:end center;font-size:9px;padding-bottom:3px" class="mono">10</span>
+              <span style="width:52px;height:44px;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;display:grid;place-items:end center;font-size:9px;padding-bottom:3px" class="mono">14</span>
+              <span style="width:52px;height:44px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;display:grid;place-items:end center;font-size:9px;padding-bottom:3px" class="mono">20</span>
+              <span style="width:52px;height:44px;background:var(--surface-2);border:1px solid var(--border);border-radius:28px;display:grid;place-items:end center;font-size:9px;padding-bottom:3px" class="mono">28</span>
+            </div>
+            <div class="badges" style="gap:16px">
+              <span style="width:70px;height:52px;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh-sm)"></span>
+              <span style="width:70px;height:52px;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh-md)"></span>
+              <span style="width:70px;height:52px;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh-lg)"></span>
+              <span style="width:70px;height:52px;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--glow)"></span>
+            </div>
+            <p class="faint" style="font-size:11.5px;margin:14px 0 0">sm · md · lg · brand-glow. Elevation encodes distance from the surface, not decoration.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="sub">Components</h3>
+      <div class="demo-grid">
+        <div class="card demowrap">
+          <h4 style="margin-bottom:14px">Buttons</h4>
+          <div class="badges" style="gap:10px;margin-bottom:12px">
+            <button class="btn btn-grad">Start test</button>
+            <button class="btn">Secondary</button>
+            <button class="btn" style="background:transparent;border-color:transparent">Ghost</button>
+          </div>
+          <div class="badges" style="gap:10px">
+            <button class="btn" style="border-color:var(--error);color:var(--error);background:var(--error-bg)">Destructive</button>
+            <button class="btn btn-grad" style="padding:6px 11px;font-size:12px">Small</button>
+            <button class="btn btn-grad" style="padding:11px 18px;font-size:15px">Large</button>
+          </div>
+        </div>
+        <div class="card demowrap">
+          <h4 style="margin-bottom:14px">Inputs</h4>
+          <div class="field"><label for="d1">Country</label><input class="input" id="d1" value="United States"></div>
+          <div class="field"><label for="d2">Email</label><input class="input err" id="d2" value="not-an-email"><span class="hint err">Enter a valid email address.</span></div>
+        </div>
+        <div class="card demowrap">
+          <h4 style="margin-bottom:14px">Badges &amp; chips</h4>
+          <div class="badges">
+            <span class="bdg br">Fiber</span><span class="bdg su">99.98% uptime</span>
+            <span class="bdg wa">High latency</span><span class="bdg er">Packet loss</span>
+            <span class="bdg" style="color:var(--fg-muted)">Unlimited</span>
+          </div>
+          <div class="badges" style="margin-top:14px">
+            <span class="chip" style="background:var(--success-bg);color:var(--success);border-color:transparent"><span style="width:6px;height:6px;border-radius:50%;background:var(--success)"></span> Complete</span>
+            <span class="chip" style="background:var(--info-bg);color:var(--info);border-color:transparent"><span style="width:6px;height:6px;border-radius:50%;background:var(--info)"></span> Measuring…</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 5 -->
+    <section id="p5">
+      <span class="eyebrow"><span class="dot"></span> Phase 5</span>
+      <h2 class="title">Figma &amp; Stitch Structure</h2>
+      <p class="lead">A file organised the way a design team actually works — foundations feed components, components feed screens, everything flows to handoff.</p>
+      <div class="grid-2" style="margin-top:26px">
+        <div class="card demowrap">
+          <h4 style="margin-bottom:12px">Figma file · pages</h4>
+          <pre><span class="c"># Pages (left rail)</span>
+<span class="k">📐 00 · Cover</span>          <span class="c">/ file map, changelog</span>
+<span class="k">🎨 01 · Foundations</span>    <span class="c">/ color, type, grid, elevation</span>
+<span class="k">🔡 02 · Tokens</span>         <span class="c">/ Variables: primitive → semantic</span>
+<span class="k">🧩 03 · Components</span>     <span class="c">/ variants + interactive</span>
+<span class="k">📝 04 · Wireframes</span>     <span class="c">/ lo-fi, greyscale</span>
+<span class="k">✨ 05 · Hi-Fi</span>          <span class="c">/ desktop · tablet · mobile</span>
+<span class="k">🔗 06 · Prototype</span>      <span class="c">/ flows + smart animate</span>
+<span class="k">📦 07 · Handoff</span>        <span class="c">/ specs, redlines, tokens</span></pre>
+        </div>
+        <div class="card demowrap">
+          <h4 style="margin-bottom:12px">Conventions</h4>
+          <ul class="list-check">
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Variables, 3 tiers.</b>&nbsp;<span class="mono" style="font-size:12px">primitive/indigo-500 → semantic/brand → comp/button-bg</span></li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Modes.</b>&nbsp;A single Variable collection with <span class="mono" style="font-size:12px">Light / Dark</span> modes; every screen inherits.</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Naming.</b>&nbsp;<span class="mono" style="font-size:12px">Component/Property=Value</span> — e.g. <span class="mono" style="font-size:12px">Button/variant=primary, size=md, state=hover</span></li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Auto Layout everywhere.</b>&nbsp;Hug/fill, 8pt gaps, min-width guards for responsive resize.</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Stitch-ready.</b>&nbsp;Screens map 1:1 to Stitch: one frame = one screen, tokens exported as a theme, components as Stitch design-system entries.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 6 -->
+    <section id="p6">
+      <span class="eyebrow"><span class="dot"></span> Phase 6</span>
+      <h2 class="title">Screen Redesigns</h2>
+      <p class="lead">The section order, layout logic, and live mockups for each surface. Responsive behaviour noted per screen: desktop → tablet → mobile.</p>
+
+      <h3 class="sub">1 · Landing — section order</h3>
+      <div class="card demowrap">
+        <div class="tablewrap" style="border:0">
+          <table>
+            <thead><tr><th>#</th><th>Section</th><th>Job</th><th>Change from today</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">01</td><td><b>Hero + live test</b></td><td class="muted">Run a test in the first screen</td><td class="muted">Headline sharpened; dashboard is the focal point, not a sidebar</td></tr>
+              <tr><td class="mono">02</td><td><b>Result → meaning</b></td><td class="muted">Turn numbers into 6 scores</td><td class="muted">New; today the scores hide in "AI Doctor"</td></tr>
+              <tr><td class="mono">03</td><td><b>How it works</b></td><td class="muted">Build trust in the method</td><td class="muted">New; replaces disclaimer paragraphs</td></tr>
+              <tr><td class="mono">04</td><td><b>ISP intelligence</b></td><td class="muted">Explore + compare</td><td class="muted">3 dense sections merged into 1 tabbed surface</td></tr>
+              <tr><td class="mono">05</td><td><b>Pricing</b></td><td class="muted">Convert</td><td class="muted">New; there is no pricing today</td></tr>
+              <tr><td class="mono">06</td><td><b>Trust · FAQ · CTA</b></td><td class="muted">Close</td><td class="muted">Social proof + methodology replace "sample data" apologies</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="faint" style="font-size:12px;margin:14px 0 0"><b>Responsive:</b> two-column hero (copy + instrument) collapses to a single column under 900px with the instrument first; the 14 legacy sections collapse to 6 to cut scroll depth ~55%.</p>
+      </div>
+
+      <h3 class="sub">2 · Dashboard — live mock</h3>
+      <div class="dash">
+        <div class="dash-top glass">
+          <span class="dot3"><i></i><i></i><i></i></span>
+          <span class="mono" style="font-size:12px;color:var(--fg-muted)">app.wifiplus — Overview</span>
+          <span class="chip" style="margin-left:auto;font-size:11px"><span style="width:6px;height:6px;border-radius:50%;background:var(--success)"></span> Live</span>
+        </div>
+        <div class="dash-body">
+          <div class="dnav">
+            <a class="on"><span class="ic"></span> Overview</a>
+            <a><span class="ic" style="opacity:.5"></span> History</a>
+            <a><span class="ic" style="opacity:.5"></span> Providers</a>
+            <a><span class="ic" style="opacity:.5"></span> Alerts</a>
+            <a><span class="ic" style="opacity:.5"></span> Settings</a>
+          </div>
+          <div class="dmain">
+            <div class="stat-row">
+              <div class="stat"><div class="k">Download</div><div class="v tnum">942<small> Mbps</small></div><div class="trend">▲ 4.2% vs last</div></div>
+              <div class="stat"><div class="k">Upload</div><div class="v tnum">318<small> Mbps</small></div><div class="trend">▲ 1.1%</div></div>
+              <div class="stat"><div class="k">Ping</div><div class="v tnum">7<small> ms</small></div><div class="trend" style="color:var(--success)">▼ 2 ms</div></div>
+              <div class="stat"><div class="k">Health</div><div class="v tnum">94<small>/100</small></div><div class="trend">Excellent</div></div>
+            </div>
+            <div class="card" style="margin-top:14px;padding:14px 16px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <b style="font-size:13px">7-day throughput</b><span class="faint" style="font-size:11px">Mbps</span>
+              </div>
+              <svg viewBox="0 0 320 80" width="100%" height="80" preserveAspectRatio="none" aria-hidden="true">
+                <defs><linearGradient id="spark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b5ff0" stop-opacity=".45"/><stop offset="1" stop-color="#5b5ff0" stop-opacity="0"/></linearGradient></defs>
+                <path d="M0,58 40,50 80,54 120,34 160,40 200,22 240,30 280,14 320,20 320,80 0,80Z" fill="url(#spark)"/>
+                <path d="M0,58 40,50 80,54 120,34 160,40 200,22 240,30 280,14 320,20" fill="none" stroke="#22d3ee" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="320" cy="20" r="3.5" fill="#22d3ee"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="faint" style="font-size:12px;margin:12px 0 0"><b>Responsive:</b> sidebar → bottom tab bar under 720px; stat row wraps 4→2→1; chart keeps aspect via <span class="mono" style="font-size:12px">preserveAspectRatio</span>. <b>States:</b> skeleton shimmer on load, empty-state "run your first test", error toast on measurement failure.</p>
+
+      <div class="grid-2" style="margin-top:26px">
+        <div>
+          <h3 class="sub" style="margin-top:0">3 · Authentication</h3>
+          <div class="auth card glass">
+            <div style="display:flex;justify-content:center;margin-bottom:16px"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M2.6 9.2a15 15 0 0 1 18.8 0" opacity=".55"/><path d="M5.7 12.6a10.2 10.2 0 0 1 12.6 0" opacity=".8"/><path d="M8.8 16a5.4 5.4 0 0 1 6.4 0"/><circle cx="12" cy="19.4" r="1.2" fill="#fff" stroke="none"/></svg></span></div>
+            <h4 style="text-align:center;font-size:20px;margin-bottom:4px">Welcome back</h4>
+            <p class="muted" style="text-align:center;font-size:13px;margin:0 0 18px">Sign in to sync your speed history</p>
+            <button class="btn" style="width:100%;justify-content:center;margin-bottom:10px">Continue with Google</button>
+            <div style="display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--fg-faint);font-size:11px"><span style="flex:1;height:1px;background:var(--border)"></span>OR<span style="flex:1;height:1px;background:var(--border)"></span></div>
+            <div class="field"><label for="ae">Email</label><input class="input" id="ae" value="you@example.com"></div>
+            <div class="field"><label for="ap">Password</label><input class="input" id="ap" type="password" value="123456"></div>
+            <button class="btn btn-grad" style="width:100%;justify-content:center;margin-top:6px">Sign in</button>
+          </div>
+        </div>
+        <div>
+          <h3 class="sub" style="margin-top:0">5 · Settings — pattern</h3>
+          <div class="card demowrap">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)">
+              <div><b style="font-size:14px">Adaptive theme</b><div class="muted" style="font-size:12px">Follow system light/dark</div></div>
+              <span style="width:44px;height:26px;border-radius:99px;background:var(--grad);position:relative;flex:none"><i style="position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff"></i></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)">
+              <div><b style="font-size:14px">Scheduled tests</b><div class="muted" style="font-size:12px">Auto-run every 6 hours</div></div>
+              <span style="width:44px;height:26px;border-radius:99px;background:var(--surface-2);border:1px solid var(--border);position:relative;flex:none"><i style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--fg-faint)"></i></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+              <div><b style="font-size:14px">Outage alerts</b><div class="muted" style="font-size:12px">Email when your ISP degrades</div></div>
+              <span style="width:44px;height:26px;border-radius:99px;background:var(--grad);position:relative;flex:none"><i style="position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff"></i></span>
+            </div>
+            <p class="faint" style="font-size:11.5px;margin:14px 0 0">Grouped sections · one toggle = one outcome · destructive actions isolated at the bottom with a confirm step.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="sub">4 · Pricing — live mock</h3>
+      <div class="price-grid">
+        <div class="plan card">
+          <div class="pname">Free</div>
+          <div class="amt tnum">$0</div>
+          <div class="muted" style="font-size:13px">Everything to test one connection</div>
+          <ul>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>Unlimited real speed tests</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>Ping, jitter, loss &amp; DNS</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>ISP comparison &amp; rankings</li>
+          </ul>
+          <button class="btn" style="width:100%;justify-content:center">Start testing</button>
+        </div>
+        <div class="plan card glass feat">
+          <span class="tag">Most popular</span>
+          <div class="pname">Pro</div>
+          <div class="amt tnum">$6<span style="font-size:15px;color:var(--fg-muted)">/mo</span></div>
+          <div class="muted" style="font-size:13px">Evidence over time, not a snapshot</div>
+          <ul>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>Scheduled background tests</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>12-month history &amp; trends</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>AI WiFi Doctor + outage alerts</li>
+          </ul>
+          <button class="btn btn-grad" style="width:100%;justify-content:center">Upgrade to Pro</button>
+        </div>
+        <div class="plan card">
+          <div class="pname">Business</div>
+          <div class="amt tnum">$49<span style="font-size:15px;color:var(--fg-muted)">/mo</span></div>
+          <div class="muted" style="font-size:13px">Multi-site monitoring &amp; API</div>
+          <ul>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>Unlimited sites &amp; devices</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>Team dashboards &amp; roles</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>Enterprise ISP API</li>
+          </ul>
+          <button class="btn" style="width:100%;justify-content:center">Talk to us</button>
+        </div>
+      </div>
+      <p class="faint" style="font-size:12px;margin:14px 0 0"><b>Responsive:</b> 3-up → 1-up stacked with the featured plan first on mobile; monthly/yearly toggle animates the price with a keyed fade. <b>6 · Contact:</b> single glass card, floating labels, inline validation, success state replaces the form in place.</p>
+    </section>
+
+    <!-- PHASE 7 -->
+    <section id="p7">
+      <span class="eyebrow"><span class="dot"></span> Phase 7</span>
+      <h2 class="title">Conversion Optimization</h2>
+      <div class="grid" style="margin-top:24px">
+        <div class="card prob"><span class="sev crit">Hero</span><div><h4>Run the test in the first viewport</h4><p>Today the hero splits attention between two CTAs and a wall of copy. New: one primary "Start speed test", the live instrument as proof, a rotating sub-headline. <span class="fix">Expected: lower bounce, higher activation — the aha-moment happens before any scroll.</span></p></div></div>
+        <div class="card prob"><span class="sev crit">Trust</span><div><h4>Turn disclaimers into credibility</h4><p>"This static prototype uses demo data" appears repeatedly and quietly kills trust. Replace with a methodology strip ("measured from real bytes, median latency, ramp discarded"), a real result card, and clearly-labelled sample vs. measured data. <span class="fix">Honesty stays; the framing flips from apology to authority.</span></p></div></div>
+        <div class="card prob"><span class="sev high">Social proof</span><div><h4>Add evidence a human left</h4><p>Zero testimonials, logos, or usage numbers today. Add an infinite logo/marquee of "measured on" ISPs, attributed reviews, and a live "N tests run today" counter. <span class="fix">Placeholders must be labelled until real proof exists — never fabricate reviews.</span></p></div></div>
+        <div class="card prob"><span class="sev high">Pricing</span><div><h4>Give the funnel a destination</h4><p>There is no pricing and no email capture — the site has nowhere to convert. Add the 3-tier table, a free-forever anchor, and a newsletter capture in the footer. <span class="fix">A clear "free" anchor de-risks the upgrade.</span></p></div></div>
+        <div class="card prob"><span class="sev med">FAQ &amp; CTA</span><div><h4>Answer the real objections, then close</h4><p>Reframe FAQ around "is this real?", "what happens to my screenshot?", "why differ from other tests?". End every major section with a single contextual CTA rather than repeating the same button. <span class="fix">Objection-handling copy converts skeptics of a measurement tool.</span></p></div></div>
+      </div>
+    </section>
+
+    <!-- PHASE 8 + 9 -->
+    <section id="p8">
+      <span class="eyebrow"><span class="dot"></span> Phase 8 &amp; 9</span>
+      <h2 class="title">Micro-interactions &amp; Animation</h2>
+      <p class="lead">Motion tokens first, then where each is used. One easing family (<span class="mono" style="font-size:13px">expo.out · cubic-bezier(.16,1,.3,1)</span>) keeps 20 surfaces feeling like one product. Everything respects <span class="mono" style="font-size:13px">prefers-reduced-motion</span>.</p>
+      <div class="card demowrap" style="margin-top:22px">
+        <div class="tablewrap" style="border:0">
+          <table>
+            <thead><tr><th>Token</th><th>Duration</th><th>Easing</th><th>Used for</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">motion/instant</td><td class="mono">120ms</td><td class="mono">ease-out</td><td class="muted">Hover, focus, chip toggles</td></tr>
+              <tr><td class="mono">motion/base</td><td class="mono">220ms</td><td class="mono">expo.out</td><td class="muted">Buttons, dropdowns, tabs (layout slide)</td></tr>
+              <tr><td class="mono">motion/enter</td><td class="mono">340ms</td><td class="mono">expo.out</td><td class="muted">Scroll-reveal (fade + 16px rise + de-blur)</td></tr>
+              <tr><td class="mono">motion/spring</td><td class="mono">—</td><td class="mono">stiffness 220 · damping 26</td><td class="muted">Modals, magnetic buttons, gauge fill</td></tr>
+              <tr><td class="mono">motion/exit</td><td class="mono">160ms</td><td class="mono">ease-in</td><td class="muted">Dismiss — always faster than enter</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-top:16px">
+        <div class="card ix"><h4>Buttons</h4><p>Lift 1px + gradient bloom on hover; scale 0.97 on press; ripple from pointer; magnetic pull on the primary CTA.</p><span class="spec-line">translateY(-1) · 220ms · expo.out</span></div>
+        <div class="card ix"><h4>Cards</h4><p>3D tilt toward cursor (max 8°), spotlight follows pointer, gradient ring fades in. Off for cards holding inputs.</p><span class="spec-line">rotateX/Y · spring</span></div>
+        <div class="card ix"><h4>Live test</h4><p>Each metric tile sheens as its value lands; progress bar is gradient-filled; gauge counts up with spring.</p><span class="spec-line">count-up · rAF · reduced-motion → snap</span></div>
+        <div class="card ix"><h4>Scroll</h4><p>Sections reveal once (fade + rise + de-blur); hero canvas parallax; ambient blobs drift on the compositor only.</p><span class="spec-line">IntersectionObserver · once</span></div>
+        <div class="card ix"><h4>Accordion / tabs</h4><p>Height + opacity ease; active pill travels between tabs via shared layout id, never cross-fades.</p><span class="spec-line">layoutId · 260ms</span></div>
+        <div class="card ix"><h4>Skeleton &amp; states</h4><p>Shimmer sweeps left→right at 1.4s; success check draws on; error shake ×1 then settle.</p><span class="spec-line">shimmer 1400ms linear</span></div>
+      </div>
+      <div class="callout" style="margin-top:20px"><b>Tooling:</b> Framer Motion for React state/gesture choreography; CSS keyframes for ambient loops (aurora, marquee, shimmer — zero JS/frame); GSAP + ScrollTrigger only for the hero pin if needed; Lottie reserved for the empty-state illustration. 60fps rule: animate only <span class="mono" style="font-size:12px">transform / opacity / filter</span>.</div>
+    </section>
+
+    <!-- PHASE 10 -->
+    <section id="p10">
+      <span class="eyebrow"><span class="dot"></span> Phase 10</span>
+      <h2 class="title">Developer Handoff</h2>
+      <p class="lead">Copy-paste tokens. CSS custom properties and a Tailwind config, both generated from the same primitive scale.</p>
+      <div class="codegrid" style="margin-top:24px">
+        <div>
+          <h4 style="margin-bottom:10px">CSS variables</h4>
+          <pre><span class="c">/* :root = dark (primary) */</span>
+<span class="k">--bg</span>: <span class="n">#080B16</span>;
+<span class="k">--surface</span>: rgba(255,255,255,<span class="n">.06</span>);
+<span class="k">--border</span>: rgba(255,255,255,<span class="n">.10</span>);
+<span class="k">--fg</span>: <span class="n">#F4F6FF</span>;
+<span class="k">--fg-muted</span>: <span class="n">#9AA4BD</span>;
+<span class="k">--brand</span>: <span class="n">#5B5FF0</span>;
+<span class="k">--accent</span>: <span class="n">#22D3EE</span>;
+<span class="k">--violet</span>: <span class="n">#8B5CF6</span>;
+<span class="k">--success</span>: <span class="n">#34D399</span>;
+<span class="k">--warning</span>: <span class="n">#FBBF24</span>;
+<span class="k">--error</span>: <span class="n">#FB7185</span>;
+<span class="k">--grad</span>: linear-gradient(120deg,
+   <span class="s">#8b5cf6</span>,<span class="s">#5b5ff0</span> 46%,<span class="s">#22d3ee</span>);
+<span class="k">--r-md</span>: <span class="n">14px</span>; <span class="k">--r-lg</span>: <span class="n">20px</span>;
+<span class="k">--sh-md</span>: 0 6px 20px -8px rgba(2,4,12,.7);</pre>
+        </div>
+        <div>
+          <h4 style="margin-bottom:10px">tailwind.config.ts</h4>
+          <pre><span class="k">export default</span> {
+  theme: { extend: {
+    colors: {
+      brand: { DEFAULT: <span class="s">'#5B5FF0'</span>,
+        <span class="n">400</span>:<span class="s">'#8184F3'</span>, <span class="n">600</span>:<span class="s">'#4A4CE2'</span> },
+      accent: <span class="s">'#22D3EE'</span>,
+      violet: <span class="s">'#8B5CF6'</span>,
+      ink: <span class="s">'#080B16'</span>,
+    },
+    borderRadius: { md:<span class="s">'14px'</span>, lg:<span class="s">'20px'</span>, xl:<span class="s">'28px'</span> },
+    spacing: { <span class="c">/* 8pt */</span>
+      <span class="n">1</span>:<span class="s">'4px'</span>,<span class="n">2</span>:<span class="s">'8px'</span>,<span class="n">3</span>:<span class="s">'12px'</span>,<span class="n">4</span>:<span class="s">'16px'</span>,
+      <span class="n">5</span>:<span class="s">'24px'</span>,<span class="n">6</span>:<span class="s">'32px'</span>,<span class="n">7</span>:<span class="s">'48px'</span>,<span class="n">8</span>:<span class="s">'64px'</span> },
+      fontFamily: { sans: [<span class="s">'Inter'</span>,<span class="s">'system-ui'</span>] },
+      boxShadow: { glow:<span class="s">'0 12px 40px -12px rgba(91,95,240,.55)'</span> },
+    },
+  },
+}</pre>
+        </div>
+      </div>
+      <div class="card demowrap" style="margin-top:16px">
+        <h4 style="margin-bottom:10px">Breakpoints &amp; component naming</h4>
+        <div class="grid-2">
+          <pre><span class="c">/* mobile-first breakpoints */</span>
+sm  <span class="n">375px</span>   <span class="c">phone</span>
+md  <span class="n">768px</span>   <span class="c">tablet</span>
+lg  <span class="n">1024px</span>  <span class="c">laptop</span>
+xl  <span class="n">1280px</span>  <span class="c">desktop</span>
+2xl <span class="n">1536px</span>  <span class="c">wide</span></pre>
+          <pre><span class="c">/* component naming (BEM-ish / RSC) */</span>
+&lt;Button variant="primary" size="md" /&gt;
+&lt;GlassCard tilt spotlight ring /&gt;
+&lt;MetricTile featured /&gt;
+&lt;PricingCard featured /&gt;
+&lt;StatTile trend="up" /&gt;</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 11 -->
+    <section id="p11">
+      <span class="eyebrow"><span class="dot"></span> Phase 11</span>
+      <h2 class="title">AI Image &amp; Asset Direction</h2>
+      <p class="lead">Prompts and specs for the few generated assets this design needs — used sparingly, because the live instrument is the real hero.</p>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:22px">
+        <div class="card demowrap"><h4>Hero ambient (CSS, not image)</h4><p class="muted" style="font-size:13px;margin:8px 0 0">Aurora mesh: 3 radial fields (violet/indigo/cyan at 8–18% alpha) + faint 56px grid with a top-fade mask. Zero network cost — already rendering behind this page.</p></div>
+        <div class="card demowrap"><h4>Empty-state illustration (Lottie)</h4><p class="muted" style="font-size:13px;margin:8px 0 0"><i>"Minimal line-art radar sweep over a globe, indigo→cyan gradient stroke, dark transparent bg, single subtle loop, no text, 2px strokes."</i> For "run your first test".</p></div>
+        <div class="card demowrap"><h4>3D signal object (spot use)</h4><p class="muted" style="font-size:13px;margin:8px 0 0"><i>"Frosted-glass torus knot emitting concentric signal rings, soft indigo rim light, cyan bloom, floating on deep navy, studio render, subtle depth of field."</i> Pricing/CTA accent only.</p></div>
+        <div class="card demowrap"><h4>Iconography</h4><p class="muted" style="font-size:13px;margin:8px 0 0">Lucide, 1.75px stroke, inside glass orbs with a tone-matched inner glow. Never emoji. Consistent 20/24px grid.</p></div>
+        <div class="card demowrap"><h4>OG / social card</h4><p class="muted" style="font-size:13px;margin:8px 0 0">1200×630, dark ground, signal gradient bar, live-metric tiles, wordmark + signal arcs. PNG (SVG is rejected by social scrapers).</p></div>
+        <div class="card demowrap"><h4>Patterns &amp; texture</h4><p class="muted" style="font-size:13px;margin:8px 0 0">SVG fractal-noise film grain at 3–4% opacity, overlay blend. Mesh-gradient blobs on the compositor. No stock photography anywhere.</p></div>
+      </div>
+    </section>
+
+    <!-- PHASE 12 -->
+    <section id="p12">
+      <span class="eyebrow"><span class="dot"></span> Phase 12</span>
+      <h2 class="title">Final Output &amp; Reports</h2>
+      <p class="lead">The 16 requested deliverables, plus the accessibility, SEO and performance reports.</p>
+
+      <h3 class="sub">The 16 deliverables</h3>
+      <div class="deliv">
+        <div class="card d"><span class="n">01</span><div><b>UX Audit Report</b><p>Phase 1 scorecard, 33 categories</p></div></div>
+        <div class="card d"><span class="n">02</span><div><b>UI Audit Report</b><p>Type, color, grid, components</p></div></div>
+        <div class="card d"><span class="n">03</span><div><b>Design System</b><p>Phase 4 · live tokens</p></div></div>
+        <div class="card d"><span class="n">04</span><div><b>Wireframes</b><p>Section order · lo-fi</p></div></div>
+        <div class="card d"><span class="n">05</span><div><b>Hi-Fi Layout</b><p>Live mocks · Phase 6</p></div></div>
+        <div class="card d"><span class="n">06</span><div><b>Figma Structure</b><p>Phase 5</p></div></div>
+        <div class="card d"><span class="n">07</span><div><b>Stitch Structure</b><p>1:1 screen mapping</p></div></div>
+        <div class="card d"><span class="n">08</span><div><b>Responsive Layouts</b><p>375 · 768 · 1024 · 1440</p></div></div>
+        <div class="card d"><span class="n">09</span><div><b>Component Library</b><p>Buttons→dashboard</p></div></div>
+        <div class="card d"><span class="n">10</span><div><b>Animation Spec</b><p>Phase 8–9 tokens</p></div></div>
+        <div class="card d"><span class="n">11</span><div><b>Developer Handoff</b><p>CSS + Tailwind</p></div></div>
+        <div class="card d"><span class="n">12</span><div><b>Accessibility Report</b><p>Below · WCAG AA+</p></div></div>
+        <div class="card d"><span class="n">13</span><div><b>SEO UX</b><p>Below</p></div></div>
+        <div class="card d"><span class="n">14</span><div><b>Performance UX</b><p>Below</p></div></div>
+        <div class="card d"><span class="n">15</span><div><b>Conversion</b><p>Phase 7</p></div></div>
+        <div class="card d"><span class="n">16</span><div><b>Final Redesign</b><p>This system, built</p></div></div>
+      </div>
+
+      <div class="grid-2" style="margin-top:26px">
+        <div class="card demowrap">
+          <h4 style="margin-bottom:12px">Accessibility · WCAG AA+ contrast</h4>
+          <div class="tablewrap" style="border:0">
+            <table>
+              <thead><tr><th>Pair</th><th class="tnum">Ratio</th><th>Level</th></tr></thead>
+              <tbody>
+                <tr><td class="muted">FG #F4F6FF on #080B16</td><td class="tnum">18.2:1</td><td><span class="bdg su">AAA</span></td></tr>
+                <tr><td class="muted">Muted #9AA4BD on #080B16</td><td class="tnum">7.4:1</td><td><span class="bdg su">AAA</span></td></tr>
+                <tr><td class="muted">Cyan #22D3EE on #080B16</td><td class="tnum">9.1:1</td><td><span class="bdg su">AAA</span></td></tr>
+                <tr><td class="muted">White on brand #5B5FF0</td><td class="tnum">4.9:1</td><td><span class="bdg su">AA</span></td></tr>
+                <tr><td class="muted">Error #FB7185 on #080B16</td><td class="tnum">6.2:1</td><td><span class="bdg su">AA</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ul class="list-check" style="margin-top:14px">
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Visible focus ring on every interactive element (2px cyan, 2px offset)</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>44×44px min touch targets · 8px+ spacing</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>State never by color alone — icon + label + chip</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Real tables/labels/ARIA; skip link; reduced-motion honored</li>
+          </ul>
+        </div>
+        <div class="card demowrap">
+          <h4 style="margin-bottom:12px">SEO &amp; Performance UX</h4>
+          <ul class="list-check">
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>CLS &lt; 0.1</b> — reserve space for the instrument &amp; images; count-ups don't reflow (tabular-nums + fixed width)</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Preconnect</b> to measurement edges warms the first test by 100–300ms (INP)</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Self-hosted Inter</b>, WebP/AVIF art, lazy-load below fold, GPU-only animation</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Structured data</b> — WebApplication + FAQ + Organization JSON-LD; unique per-screen titles</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b>Content depth</b> — location pages (Best ISP in…) become the organic engine, each backed by live comparison data</li>
+          </ul>
+          <div class="callout" style="margin-top:16px"><b>Already built.</b> A production implementation of this system lives in the repo at <span class="mono" style="font-size:12px">web/</span> (Next.js 15 · Tailwind · Framer Motion) — this document is its design source of truth.</div>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <div style="text-align:center;padding-bottom:20px">
+        <span class="eyebrow"><span class="dot"></span> End of deliverable</span>
+        <h3 style="font-size:clamp(22px,3vw,32px);margin:18px 0 8px;letter-spacing:-.03em">From <span class="tnum">5.3</span> → a <span class="grad" style="background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent">9.1</span> product.</h3>
+        <p class="muted" style="max-width:52ch;margin:0 auto">Same honest engineering underneath — a surface that finally matches it. Toggle the theme, scan the tokens, and it's ready for Figma, Stitch, and the <span class="mono" style="font-size:13px">web/</span> build.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---- build TOC from sections ---- */
+  var items = [
+    ["overview","Overview","—"],["p1","Full Audit","01"],["p2","UX Problems","02"],
+    ["p3","Strategy","03"],["p4","Design System","04"],["p5","Figma / Stitch","05"],
+    ["p6","Screen Redesigns","06"],["p7","Conversion","07"],["p8","Motion","08–09"],
+    ["p10","Handoff","10"],["p11","Assets","11"],["p12","Final Output","12"]
+  ];
+  function buildNav(target){
+    items.forEach(function(it){
+      var a=document.createElement("a");
+      a.href="#"+it[0];
+      a.innerHTML='<span class="num">'+it[2]+'</span><span>'+it[1]+'</span>';
+      a.dataset.id=it[0];
+      target.appendChild(a);
+    });
+  }
+  var toc=document.getElementById("toc"); buildNav(toc);
+  var drawerNav=document.getElementById("drawerNav"); buildNav(drawerNav);
+
+  /* ---- scrollspy ---- */
+  var links=Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map={}; links.forEach(function(l){ map[l.dataset.id]=l; });
+  var spy=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        links.forEach(function(l){ l.classList.remove("active"); });
+        if(map[e.target.id]) map[e.target.id].classList.add("active");
+      }
+    });
+  },{rootMargin:"-45% 0px -50% 0px"});
+  document.querySelectorAll("section[id]").forEach(function(s){ spy.observe(s); });
+
+  /* ---- theme toggle ---- */
+  var root=document.documentElement, label=document.getElementById("themeLabel");
+  function apply(mode){
+    root.setAttribute("data-theme",mode);
+    label.textContent = mode==="dark" ? "Light" : "Dark";
+  }
+  // initial: follow system
+  apply(matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  document.getElementById("themeBtn").addEventListener("click",function(){
+    apply(root.getAttribute("data-theme")==="dark" ? "light" : "dark");
+  });
+
+  /* ---- mobile drawer ---- */
+  var drawer=document.getElementById("drawer");
+  document.getElementById("menuBtn").addEventListener("click",function(){ drawer.classList.add("open"); });
+  drawer.addEventListener("click",function(e){
+    if(e.target.hasAttribute("data-close") || e.target.tagName==="A") drawer.classList.remove("open");
+  });
+
+  /* ---- animate score bars + gauge on reveal ---- */
+  function fillBars(scope){
+    scope.querySelectorAll(".bar > i").forEach(function(i){
+      var w=i.dataset.w; if(reduce){ i.style.width=w; } else { requestAnimationFrame(function(){ i.style.width=w; }); }
+    });
+  }
+  var gaugeArc=document.getElementById("gaugeArc");
+  function fillGauge(){
+    var v=5.3, off=402-(402*(v/10));
+    if(reduce){ gaugeArc.style.strokeDashoffset=off; return; }
+    gaugeArc.style.transition="stroke-dashoffset 1.4s cubic-bezier(.16,1,.3,1)";
+    requestAnimationFrame(function(){ gaugeArc.style.strokeDashoffset=off; });
+  }
+
+  /* ---- render scorecard ---- */
+  var groups=[
+    ["Hierarchy & Layout", [
+      ["Visual hierarchy",5,"Sections share one weight; no focal point pulls the eye first."],
+      ["Grid",6,"Consistent card grids, but monotonous — same rhythm 14× in a row."],
+      ["Spacing",5,"Tight, dashboard-dense; sections crowd each other."],
+      ["White space",4,"Insufficient — the page reads as a text-dense pitch deck."],
+      ["Visual balance",5,"Heavy and even; nothing is allowed to be the star."],
+      ["Section flow",5,"Repetitive heading+grid cadence flattens the story."],
+      ["Card layouts",5,"Uniform flat cards; little depth or differentiation."]
+    ]],
+    ["Type, Color & Brand", [
+      ["Typography",5,"System stack, fine but characterless; long dense paragraphs."],
+      ["Color system",5,"Teal/blue/amber accents compete; reads as generic dashboard."],
+      ["Readability",5,"Text-heavy; paragraphs where a chip or number would do."],
+      ["Branding",4,"Generic wordmark, no distinctive identity or voice."],
+      ["Component consistency",6,"Card system is consistent even if plain."],
+      ["Design system quality",5,"Ad-hoc CSS vars; no token scale or discipline."]
+    ]],
+    ["Interaction & Motion", [
+      ["Micro interactions",4,"Basic hover only; the page feels static."],
+      ["Animation",4,"Nice hero canvas; nothing else moves with intent."],
+      ["Scroll behavior",6,"Smooth-scroll works; no reveal or parallax payoff."],
+      ["Loading states",5,"Speed-test progress bar good; no skeletons elsewhere."],
+      ["Empty states",5,"Metrics show '--'; functional but unguided."],
+      ["Error handling",6,"Test + upload errors handled; messaging is plain."]
+    ]],
+    ["UX, Trust & Conversion", [
+      ["User psychology",4,"Repeated 'prototype / sample data' quietly erodes trust."],
+      ["CTA placement",5,"Two hero CTAs compete; no single clear path."],
+      ["Trust building",4,"No proof, logos, or testimonials; disclaimer-heavy."],
+      ["Conversion optimization",3,"No pricing, capture, or funnel — nowhere to convert."],
+      ["Information architecture",5,"14 sprawling sections read like a deck, not a product."],
+      ["Navigation",6,"Sticky, 6 links — but doesn't map to all sections."],
+      ["Footer",5,"Minimal links + attribution; no capture or depth."],
+      ["Forms",5,"Plain native selects/ranges; no floating labels or polish."],
+      ["Hero effectiveness",5,"Live lab is a real asset, but cluttered and unfocused."]
+    ]],
+    ["Platform & Access", [
+      ["Responsiveness",6,"Reasonable; dense tables strain smaller screens."],
+      ["Mobile UX",5,"Comparison tables and dense grids fight the viewport."],
+      ["Desktop UX",6,"Functional and complete, if visually flat."],
+      ["Accessibility",6,"Skip link, ARIA, focus present; some muted contrast is borderline."],
+      ["Performance (UX)",6,"Real measurement is fast; heavy DOM and canvas add weight."]
+    ]]
+  ];
+
+  function avg(rows){ var s=0; rows.forEach(function(r){s+=r[1];}); return (s/rows.length).toFixed(1); }
+  function cls(v){ return v<5 ? "b-low" : v<7 ? "b-mid" : ""; }
+
+  var host=document.getElementById("scoreGroups");
+  groups.forEach(function(g){
+    var block=document.createElement("div"); block.className="score-block card glass";
+    var h='<h4>'+g[0]+'<span class="avg tnum">'+avg(g[1])+'</span></h4>';
+    g[1].forEach(function(r){
+      h+='<div class="row"><span class="name">'+r[0]+'</span>'+
+         '<span style="display:flex;align-items:center;gap:10px">'+
+         '<span class="bar '+cls(r[1])+'"><i data-w="'+(r[1]*10)+'%"></i></span>'+
+         '<span class="sc tnum">'+r[1].toFixed(1)+'</span></span>'+
+         '<span class="why">'+r[2]+'</span></div>';
+    });
+    block.innerHTML=h; host.appendChild(block);
+  });
+
+  /* ---- render problems ---- */
+  var probs=[
+    ["crit","No conversion path exists","Zero pricing, zero email capture, no funnel destination. High-intent traffic from a speed test has nowhere to go.","Add 3-tier pricing, a free-forever anchor, and footer capture."],
+    ["crit","Trust is undercut by its own copy","Repeated 'static prototype / demo data' disclaimers read as apology and shake confidence in the real measurement.","Reframe as methodology + real result cards; label sample vs measured clearly."],
+    ["crit","Weak visual hierarchy","Every section is the same weight — heading + card grid — so nothing signals where to look or what matters most.","One focal point per screen; scale, space and the accent create rank."],
+    ["high","Density over clarity","14 text-dense sections; paragraphs where a number, chip or sparkline would communicate faster.","Halve density; convert prose to data viz and chips; merge overlapping sections."],
+    ["high","No social proof","No testimonials, logos, usage counts or trust marks anywhere on the page.","Add logo marquee, attributed reviews, live counters (labelled if placeholder)."],
+    ["high","Competing hero CTAs","'Start Global Test' and 'Explore ISP Database' fight for the same attention; the aha-moment is buried.","Single primary CTA; instrument as proof; secondary path recedes."],
+    ["high","Generic, undifferentiated brand","Wordmark, colors and voice read as a template tech dashboard, not a memorable product.","Signal-gradient identity, instrument-panel layout, a distinct type treatment."],
+    ["high","Mobile tables strain the viewport","6-column comparison and ranking tables are hard to parse on a phone.","Stack to cards below md; keep numbers tabular; horizontal scroll only as a last resort."],
+    ["med","Flat card system","Uniform cards with little elevation or depth make the page feel static and cheap.","Layered glass, considered elevation scale, gradient rings on key cards only."],
+    ["med","Sparse micro-interaction","Basic hover states only; the interface doesn't feel alive or responsive to input.","Tilt, spotlight, magnetic CTAs, value-land sheens, scroll reveals — all GPU-only."],
+    ["med","Thin empty & loading states","Metrics show '--' with no guidance; no skeletons while content loads.","Guided empty states ('run your first test'), shimmer skeletons, count-ups."],
+    ["med","IA reads like a pitch deck","'Monetization', 'Architecture', 'Enterprise API' sections address investors, not users.","Reorder around user questions: measure → meaning → compare → decide → trust."],
+    ["med","Plain, unpolished forms","Native selects and range inputs with no floating labels, validation styling or feedback.","Design-system inputs, floating labels, inline validation, success states."],
+    ["med","Footer is a dead end","Minimal links + attribution; no capture, sitemap depth, or next action.","Premium footer: newsletter, grouped links, social, methodology, trust line."],
+    ["med","Repetitive section rhythm","Heading + grid, heading + grid — no variation in pacing or layout type.","Alternate layouts: split, timeline, marquee, tabbed, instrument — vary the beat."],
+    ["med","Muted-text contrast is borderline","Some secondary text on the dark ground sits near the AA floor.","Blue-biased neutrals tuned to ≥7:1; verified contrast table in the system."],
+    ["med","Onboarding is unguided","New visitors get no first-run guidance toward the core action.","First-viewport test, one-line value prop, rotating proof of what's measured."],
+    ["med","SEO depth underused","Location pages exist as a concept but aren't the organic engine they could be.","'Best ISP in {city}' pages backed by live data + structured data at scale."]
+  ];
+  var phost=document.getElementById("problems");
+  probs.forEach(function(p){
+    var d=document.createElement("div"); d.className="card prob";
+    d.innerHTML='<span class="sev '+p[0]+'">'+(p[0]==="crit"?"Critical":p[0]==="high"?"High":"Medium")+'</span>'+
+      '<div><h4>'+p[1]+'</h4><p>'+p[2]+' <span class="fix">Fix: '+p[3]+'</span></p></div>';
+    phost.appendChild(d);
+  });
+
+  /* ---- reveal observers ---- */
+  var revObs=new IntersectionObserver(function(es,ob){
+    es.forEach(function(e){ if(e.isIntersecting){ fillBars(e.target); ob.unobserve(e.target); } });
+  },{threshold:.15});
+  document.querySelectorAll(".score-block").forEach(function(b){ revObs.observe(b); });
+  var gObs=new IntersectionObserver(function(es,ob){
+    es.forEach(function(e){ if(e.isIntersecting){ fillGauge(); ob.unobserve(e.target); } });
+  },{threshold:.4});
+  gObs.observe(document.getElementById("gauge"));
+})();
+</script>

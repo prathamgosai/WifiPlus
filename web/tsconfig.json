@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "ES2022"],
+    // The shared measurement engine in ../core is plain ESM JavaScript with JSDoc
+    // types, so that the static site can import it with no build step. allowJs
+    // lets this app import the same files and still get full type inference.
+    // `core` runs its own stricter `checkJs` pass, so it isn't re-checked here.
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./*"],
+      "@core/*": ["../core/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "../core/**/*.js"],
+  "exclude": ["node_modules", "out", ".next"]
+}

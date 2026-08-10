@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Internet Speed Test — Download, Upload, Ping and Jitter | WifiPlus</title>
+<meta name="description" content="Free internet speed test for download, upload, ping, jitter, packet loss, DNS and bufferbloat. Real browser measurement with no app or signup.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="Pratham Gosai">
+<link rel="canonical" href="https://wifiplus.prathamgosai.in/internet-speed-test/">
+<link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/internet-speed-test/">
+<link rel="alternate" hreflang="x-default" href="https://wifiplus.prathamgosai.in/internet-speed-test/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="WifiPlus">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="https://wifiplus.prathamgosai.in/internet-speed-test/">
+<meta property="og:title" content="Internet Speed Test — Download, Upload, Ping and Jitter | WifiPlus">
+<meta property="og:description" content="Free internet speed test for download, upload, ping, jitter, packet loss, DNS and bufferbloat. Real browser measurement with no app or signup.">
+<meta property="og:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Internet Speed Test — Download, Upload, Ping and Jitter | WifiPlus">
+<meta name="twitter:description" content="Free internet speed test for download, upload, ping, jitter, packet loss, DNS and bufferbloat. Real browser measurement with no app or signup.">
+<meta name="twitter:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta name="theme-color" content="#071116">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/landing.css">
+<link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://cloudflare-dns.com">
+<link rel="modulepreload" href="/landing.js">
+<link rel="modulepreload" href="/core/measure.js">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://wifiplus.prathamgosai.in/internet-speed-test/#webpage","url":"https://wifiplus.prathamgosai.in/internet-speed-test/","name":"Internet Speed Test — Download, Upload, Ping and Jitter | WifiPlus","description":"Free internet speed test for download, upload, ping, jitter, packet loss, DNS and bufferbloat. Real browser measurement with no app or signup.","inLanguage":"en","isPartOf":{"@id":"https://wifiplus.prathamgosai.in/#website"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://wifiplus.prathamgosai.in/og-image.png"},"breadcrumb":{"@id":"https://wifiplus.prathamgosai.in/internet-speed-test/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://wifiplus.prathamgosai.in/internet-speed-test/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://wifiplus.prathamgosai.in/"},{"@type":"ListItem","position":2,"name":"Internet speed test","item":"https://wifiplus.prathamgosai.in/internet-speed-test/"}]},{"@type":"WebApplication","name":"WifiPlus — Internet speed test","url":"https://wifiplus.prathamgosai.in/internet-speed-test/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript and a modern browser","inLanguage":"en","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Person","name":"Pratham Gosai"}},{"@type":"FAQPage","@id":"https://wifiplus.prathamgosai.in/internet-speed-test/#faq","inLanguage":"en","mainEntity":[{"@type":"Question","name":"Is this internet speed test accurate?","acceptedAnswer":{"@type":"Answer","text":"It measures real transferred bytes and real timed probes, so it accurately describes the browser and network path being tested. Device limits, VPNs, WiFi quality and server routing still affect the result because they are part of that real path."}},{"@type":"Question","name":"What is a good internet speed?","acceptedAnswer":{"@type":"Answer","text":"For a single person, 50-100 Mbps down is comfortable. A busy household with 4K streams, game downloads and calls usually benefits from 250 Mbps or more. Upload, latency and stability matter as much as download for work and calls."}},{"@type":"Question","name":"Why does speed change every time I test?","acceptedAnswer":{"@type":"Answer","text":"Shared networks change minute by minute. WiFi airtime, router queues, provider congestion and background traffic all vary, so the useful result is the pattern across repeated tests."}}]}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/">WifiPlus</a>
+  <nav aria-label="Primary">
+    <a href="/">Full test</a>
+  </nav>
+</header>
+
+<main id="main">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Home</a></li>
+      <li aria-current="page">Internet speed test</li>
+    </ol>
+  </nav>
+
+  <article>
+    <h1>Internet speed test</h1>
+    <p class="standfirst">Run one complete browser test for the numbers that decide how your internet actually feels.</p>
+    
+
+    <!-- The live test. Same engine as the full tool: real bytes, no simulation.
+         Localised strings arrive as data attributes because CSP forbids inline
+         script, and landing.js reads them from here. -->
+    <section class="tool" aria-label="Internet speed test"
+      data-phase-ping="PING"
+      data-phase-download="DOWNLOAD"
+      data-phase-upload="UPLOAD"
+      data-status-latency="Measuring ping, jitter, packet loss and DNS…"
+      data-status-download="Measuring download and latency under load…"
+      data-status-upload="Measuring upload…"
+      data-status-failed="Test failed. Check your connection and try again."
+      data-label-again="AGAIN"
+      data-verdict-good="Your router keeps queues short. Calls and games hold up while other devices download."
+      data-verdict-queueing="Noticeable queueing. Enabling Smart Queue Management (SQM/fq_codel) on your router would fix this."
+      data-verdict-severe="Severe bufferbloat. Calls will break up whenever anyone else downloads — a router queue problem, not a speed problem.">
+      <div class="stage">
+        <button class="go" id="goButton" type="button">GO</button>
+        <p class="caption" id="goCaption">Press GO — about 6 seconds, no signup.</p>
+        <div class="readout" id="readout" hidden>
+          <p class="phase" id="phase">PING</p>
+          <p class="value"><span id="value">0.00</span> <span class="unit" id="unit">ms</span></p>
+          <div class="track"><span id="bar"></span></div>
+        </div>
+      </div>
+      <dl class="results" id="results" hidden>
+        <div><dt>Download</dt><dd id="rDownload">--<span>Mbps</span></dd></div>
+        <div><dt>Upload</dt><dd id="rUpload">--<span>Mbps</span></dd></div>
+        <div><dt>Ping</dt><dd id="rPing">--<span>ms</span></dd></div>
+        <div><dt>Jitter</dt><dd id="rJitter">--<span>ms</span></dd></div>
+        <div><dt>Packet loss</dt><dd id="rLoss">--<span>%</span></dd></div>
+        <div><dt>DNS</dt><dd id="rDns">--<span>ms</span></dd></div>
+        <div><dt>Bufferbloat</dt><dd id="rBloat">--<span>grade</span></dd></div>
+        <div><dt>Stability</dt><dd id="rStability">--<span>%</span></dd></div>
+      </dl>
+      <p class="status" id="status" role="status" aria-live="polite">Ready.</p>
+    </section>
+
+    <p>A good internet speed test should not stop at a single download number. Browsing, gaming, streaming, video calls and cloud backup stress different parts of the connection, so WifiPlus measures throughput, latency, jitter, packet loss, DNS latency and latency under load in one run.</p>
+    <p>The test moves real bytes over HTTP streams, times repeated small probes and reports the sustained result after warm-up. That avoids the most common failure in browser tests: showing a short startup burst as if it were the speed your connection can hold.</p>
+
+    <h2>What each number means</h2>
+    <p>Download controls how quickly pages, videos and files arrive. Upload controls sending files, livestreaming and video calls. Ping is the delay before anything responds. Jitter is how much that delay changes between packets. Packet loss is data that never arrives. DNS latency is the lookup delay before a site starts loading. Bufferbloat is the latency added when the connection is busy.</p>
+
+    <h2>Why the result can differ from your plan</h2>
+    <p>Your plan is the maximum rate sold by the provider. The result is the rate your current device, WiFi link, router, provider route and test server can sustain right now. VPNs, old wireless cards, weak signal, peak-hour congestion and background uploads can all lower the measured number without changing the plan itself.</p>
+
+    <h2>How to get a clean test</h2>
+    <p>Run once on WiFi where you normally use the device, then run again near the router or over Ethernet. Close large downloads, pause cloud backup and avoid testing through a VPN unless the VPN is the thing you want to measure. Two or three consistent runs are more useful than one unusually high result.</p>
+
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      <details><summary><h3>Is this internet speed test accurate?</h3></summary><p>It measures real transferred bytes and real timed probes, so it accurately describes the browser and network path being tested. Device limits, VPNs, WiFi quality and server routing still affect the result because they are part of that real path.</p></details>
+      <details><summary><h3>What is a good internet speed?</h3></summary><p>For a single person, 50-100 Mbps down is comfortable. A busy household with 4K streams, game downloads and calls usually benefits from 250 Mbps or more. Upload, latency and stability matter as much as download for work and calls.</p></details>
+      <details><summary><h3>Why does speed change every time I test?</h3></summary><p>Shared networks change minute by minute. WiFi airtime, router queues, provider congestion and background traffic all vary, so the useful result is the pattern across repeated tests.</p></details>
+    </div>
+
+    <h2>Related tests</h2>
+    <ul class="related">
+        <li><a href="/wifi-speed-test/"><strong>WiFi speed test</strong><span>Measure what your wireless connection actually delivers right now — not what the plan promises.</span></a></li>
+        <li><a href="/ping-test/"><strong>Ping test</strong><span>Latency decides how responsive your connection feels. Speed does not.</span></a></li>
+        <li><a href="/bufferbloat-test/"><strong>Bufferbloat test</strong><span>This is the measurement that explains why your call falls apart the moment someone else starts a download.</span></a></li>
+    </ul>
+
+    <p class="cta"><a href="/">Run the full test — every metric in one pass →</a></p>
+  </article>
+</main>
+
+<footer class="bar foot">
+  <p>WifiPlus — real measurement, no signup, no ads.</p>
+</footer>
+
+<script type="module" src="/landing.js"></script>
+</body>
+</html>

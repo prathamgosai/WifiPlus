@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Jitter Test — Measure Latency Variation | WifiPlus</title>
+<meta name="description" content="Free jitter test measuring how much your latency varies between packets. High jitter is why calls sound robotic even when your speed test looks fine.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="Pratham Gosai">
+<link rel="canonical" href="https://wifiplus.prathamgosai.in/jitter-test/">
+<link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/jitter-test/">
+<link rel="alternate" hreflang="x-default" href="https://wifiplus.prathamgosai.in/jitter-test/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="WifiPlus">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="https://wifiplus.prathamgosai.in/jitter-test/">
+<meta property="og:title" content="Jitter Test — Measure Latency Variation | WifiPlus">
+<meta property="og:description" content="Free jitter test measuring how much your latency varies between packets. High jitter is why calls sound robotic even when your speed test looks fine.">
+<meta property="og:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Jitter Test — Measure Latency Variation | WifiPlus">
+<meta name="twitter:description" content="Free jitter test measuring how much your latency varies between packets. High jitter is why calls sound robotic even when your speed test looks fine.">
+<meta name="twitter:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta name="theme-color" content="#071116">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/landing.css">
+<link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://cloudflare-dns.com">
+<link rel="modulepreload" href="/landing.js">
+<link rel="modulepreload" href="/core/measure.js">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://wifiplus.prathamgosai.in/jitter-test/#webpage","url":"https://wifiplus.prathamgosai.in/jitter-test/","name":"Jitter Test — Measure Latency Variation | WifiPlus","description":"Free jitter test measuring how much your latency varies between packets. High jitter is why calls sound robotic even when your speed test looks fine.","inLanguage":"en","isPartOf":{"@id":"https://wifiplus.prathamgosai.in/#website"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://wifiplus.prathamgosai.in/og-image.png"},"breadcrumb":{"@id":"https://wifiplus.prathamgosai.in/jitter-test/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://wifiplus.prathamgosai.in/jitter-test/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://wifiplus.prathamgosai.in/"},{"@type":"ListItem","position":2,"name":"Jitter test","item":"https://wifiplus.prathamgosai.in/jitter-test/"}]},{"@type":"WebApplication","name":"WifiPlus — Jitter test","url":"https://wifiplus.prathamgosai.in/jitter-test/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript and a modern browser","inLanguage":"en","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Person","name":"Pratham Gosai"}},{"@type":"FAQPage","@id":"https://wifiplus.prathamgosai.in/jitter-test/#faq","inLanguage":"en","mainEntity":[{"@type":"Question","name":"What is a good jitter value?","acceptedAnswer":{"@type":"Answer","text":"Under 5 ms is excellent, under 20 ms is fine for video calls, and above 50 ms will cause audible dropouts and stuttering video."}},{"@type":"Question","name":"Why is my jitter high but my speed good?","acceptedAnswer":{"@type":"Answer","text":"They measure different things. Throughput is about volume over time; jitter is about the consistency of individual packet timing. WiFi contention and router queueing wreck the second while leaving the first untouched."}},{"@type":"Question","name":"How do I fix high jitter?","acceptedAnswer":{"@type":"Answer","text":"Move to Ethernet or 5 GHz WiFi, get closer to the router, stop large background uploads during calls, and enable Smart Queue Management (fq_codel or CAKE) if your router supports it."}}]}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/">WifiPlus</a>
+  <nav aria-label="Primary">
+    <a href="/">Full test</a>
+  </nav>
+</header>
+
+<main id="main">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Home</a></li>
+      <li aria-current="page">Jitter test</li>
+    </ol>
+  </nav>
+
+  <article>
+    <h1>Jitter test</h1>
+    <p class="standfirst">Jitter is why a call breaks up on a connection whose speed test looks perfect.</p>
+    
+
+    <!-- The live test. Same engine as the full tool: real bytes, no simulation.
+         Localised strings arrive as data attributes because CSP forbids inline
+         script, and landing.js reads them from here. -->
+    <section class="tool" aria-label="Jitter test"
+      data-phase-ping="PING"
+      data-phase-download="DOWNLOAD"
+      data-phase-upload="UPLOAD"
+      data-status-latency="Measuring ping, jitter, packet loss and DNS…"
+      data-status-download="Measuring download and latency under load…"
+      data-status-upload="Measuring upload…"
+      data-status-failed="Test failed. Check your connection and try again."
+      data-label-again="AGAIN"
+      data-verdict-good="Your router keeps queues short. Calls and games hold up while other devices download."
+      data-verdict-queueing="Noticeable queueing. Enabling Smart Queue Management (SQM/fq_codel) on your router would fix this."
+      data-verdict-severe="Severe bufferbloat. Calls will break up whenever anyone else downloads — a router queue problem, not a speed problem.">
+      <div class="stage">
+        <button class="go" id="goButton" type="button">GO</button>
+        <p class="caption" id="goCaption">Press GO — about 6 seconds, no signup.</p>
+        <div class="readout" id="readout" hidden>
+          <p class="phase" id="phase">PING</p>
+          <p class="value"><span id="value">0.00</span> <span class="unit" id="unit">ms</span></p>
+          <div class="track"><span id="bar"></span></div>
+        </div>
+      </div>
+      <dl class="results" id="results" hidden>
+        <div><dt>Download</dt><dd id="rDownload">--<span>Mbps</span></dd></div>
+        <div><dt>Upload</dt><dd id="rUpload">--<span>Mbps</span></dd></div>
+        <div><dt>Ping</dt><dd id="rPing">--<span>ms</span></dd></div>
+        <div><dt>Jitter</dt><dd id="rJitter">--<span>ms</span></dd></div>
+        <div><dt>Packet loss</dt><dd id="rLoss">--<span>%</span></dd></div>
+        <div><dt>DNS</dt><dd id="rDns">--<span>ms</span></dd></div>
+        <div><dt>Bufferbloat</dt><dd id="rBloat">--<span>grade</span></dd></div>
+        <div><dt>Stability</dt><dd id="rStability">--<span>%</span></dd></div>
+      </dl>
+      <p class="status" id="status" role="status" aria-live="polite">Ready.</p>
+    </section>
+
+    <p>Jitter is the variation in latency between consecutive packets. If ten packets arrive 20 ms apart and the eleventh arrives 90 ms later, that gap is jitter — and it is the reason voices turn robotic, video freezes for a beat, and games rubber-band while every headline number on your speed test still looks healthy.</p>
+    <p>This test measures it the way real-time protocols do: the mean absolute difference between consecutive round trips, computed in arrival order. That ordering matters. Sorting the samples first and then measuring the spread produces a nice-looking number that describes nothing a call would ever experience.</p>
+
+    <h2>Why jitter breaks calls and speed tests do not catch it</h2>
+    <p>Voice and video are streams with a deadline. Each packet has a moment when it must be played, and one that arrives late is not late — it is lost, because the moment has passed. Applications hide this with a jitter buffer that holds audio for a few tens of milliseconds before playing it, but the buffer can only absorb variation it was sized for. Beyond that, you hear the gaps. A bulk download does not care about any of this, which is why throughput can look excellent on a connection nobody can hold a call on.</p>
+
+    <h2>What causes it</h2>
+    <p>WiFi contention is the most common source: every device sharing the band takes turns, and the wait for a turn is not constant. Overloaded router queues add more, especially while something else is uploading. Powerline adapters, interference from neighbouring networks, and aggressive power saving on laptops and phones all contribute. Wired connections to an uncongested router typically show jitter under 2 ms.</p>
+
+    <h2>Reading the result</h2>
+    <p>Below 5 ms is excellent and will never be audible. 5-20 ms is normal for WiFi and fine for most calls. Between 20 and 50 ms, longer calls start to develop dropouts. Above 50 ms, real-time use is genuinely degraded, and the fix is usually the wireless hop or the router queue rather than the internet connection itself.</p>
+
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      <details><summary><h3>What is a good jitter value?</h3></summary><p>Under 5 ms is excellent, under 20 ms is fine for video calls, and above 50 ms will cause audible dropouts and stuttering video.</p></details>
+      <details><summary><h3>Why is my jitter high but my speed good?</h3></summary><p>They measure different things. Throughput is about volume over time; jitter is about the consistency of individual packet timing. WiFi contention and router queueing wreck the second while leaving the first untouched.</p></details>
+      <details><summary><h3>How do I fix high jitter?</h3></summary><p>Move to Ethernet or 5 GHz WiFi, get closer to the router, stop large background uploads during calls, and enable Smart Queue Management (fq_codel or CAKE) if your router supports it.</p></details>
+    </div>
+
+    <h2>Related tests</h2>
+    <ul class="related">
+        <li><a href="/ping-test/"><strong>Ping test</strong><span>Latency decides how responsive your connection feels. Speed does not.</span></a></li>
+        <li><a href="/bufferbloat-test/"><strong>Bufferbloat test</strong><span>This is the measurement that explains why your call falls apart the moment someone else starts a download.</span></a></li>
+        <li><a href="/wifi-speed-test/"><strong>WiFi speed test</strong><span>Measure what your wireless connection actually delivers right now — not what the plan promises.</span></a></li>
+    </ul>
+
+    <p class="cta"><a href="/">Run the full test — every metric in one pass →</a></p>
+  </article>
+</main>
+
+<footer class="bar foot">
+  <p>WifiPlus — real measurement, no signup, no ads.</p>
+</footer>
+
+<script type="module" src="/landing.js"></script>
+</body>
+</html>

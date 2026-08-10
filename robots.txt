@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+
+# Answer engines increasingly surface utilities like this directly in responses.
+# Allowing them is a deliberate visibility choice — delete a block to opt that crawler out.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://wifiplus.prathamgosai.in/sitemap.xml

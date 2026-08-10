@@ -1,0 +1,13 @@
+name = "wifiplus-router-analyzer"
+main = "src/index.js"
+compatibility_date = "2026-07-19"
+compatibility_flags = ["nodejs_compat"]
+
+# The browser origin allowed to call this Worker. Anything else gets a 403 —
+# without this, any site could point at your endpoint and spend your API budget.
+[vars]
+ALLOWED_ORIGIN = "https://wifiplus.prathamgosai.in"
+
+# ANTHROPIC_API_KEY is NOT set here — wrangler.toml is committed to git.
+# Set it as an encrypted secret instead:
+#   npx wrangler secret put ANTHROPIC_API_KEY

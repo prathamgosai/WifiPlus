@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="WifiPlus icon">
+  <rect width="256" height="256" rx="52" fill="#071116"/>
+  <rect x="36" y="36" width="184" height="184" rx="34" fill="none" stroke="#24d1c3" stroke-width="14"/>
+  <path d="M76 126c26-26 78-26 104 0" fill="none" stroke="#57a6ff" stroke-width="14" stroke-linecap="round"/>
+  <path d="M96 148c12-12 32-12 44 0" fill="none" stroke="#f6b64b" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="128" cy="174" r="12" fill="#62d26f"/>
+</svg>

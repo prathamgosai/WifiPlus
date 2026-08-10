@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Bufferbloat Test — Latency Under Load, Graded A+ to F | WifiPlus</title>
+<meta name="description" content="Free bufferbloat test measuring how far your latency rises while the connection is saturated, graded A+ to F. This is why calls break when someone downloads.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="Pratham Gosai">
+<link rel="canonical" href="https://wifiplus.prathamgosai.in/bufferbloat-test/">
+<link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/bufferbloat-test/">
+<link rel="alternate" hreflang="es" href="https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/">
+<link rel="alternate" hreflang="hi" href="https://wifiplus.prathamgosai.in/hi/bufferbloat-test/">
+<link rel="alternate" hreflang="x-default" href="https://wifiplus.prathamgosai.in/bufferbloat-test/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="WifiPlus">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="https://wifiplus.prathamgosai.in/bufferbloat-test/">
+<meta property="og:title" content="Bufferbloat Test — Latency Under Load, Graded A+ to F | WifiPlus">
+<meta property="og:description" content="Free bufferbloat test measuring how far your latency rises while the connection is saturated, graded A+ to F. This is why calls break when someone downloads.">
+<meta property="og:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bufferbloat Test — Latency Under Load, Graded A+ to F | WifiPlus">
+<meta name="twitter:description" content="Free bufferbloat test measuring how far your latency rises while the connection is saturated, graded A+ to F. This is why calls break when someone downloads.">
+<meta name="twitter:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta name="theme-color" content="#071116">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/landing.css">
+<link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://cloudflare-dns.com">
+<link rel="modulepreload" href="/landing.js">
+<link rel="modulepreload" href="/core/measure.js">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://wifiplus.prathamgosai.in/bufferbloat-test/#webpage","url":"https://wifiplus.prathamgosai.in/bufferbloat-test/","name":"Bufferbloat Test — Latency Under Load, Graded A+ to F | WifiPlus","description":"Free bufferbloat test measuring how far your latency rises while the connection is saturated, graded A+ to F. This is why calls break when someone downloads.","inLanguage":"en","isPartOf":{"@id":"https://wifiplus.prathamgosai.in/#website"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://wifiplus.prathamgosai.in/og-image.png"},"breadcrumb":{"@id":"https://wifiplus.prathamgosai.in/bufferbloat-test/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://wifiplus.prathamgosai.in/bufferbloat-test/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://wifiplus.prathamgosai.in/"},{"@type":"ListItem","position":2,"name":"Bufferbloat test","item":"https://wifiplus.prathamgosai.in/bufferbloat-test/"}]},{"@type":"WebApplication","name":"WifiPlus — Bufferbloat test","url":"https://wifiplus.prathamgosai.in/bufferbloat-test/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript and a modern browser","inLanguage":"en","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Person","name":"Pratham Gosai"}},{"@type":"FAQPage","@id":"https://wifiplus.prathamgosai.in/bufferbloat-test/#faq","inLanguage":"en","mainEntity":[{"@type":"Question","name":"What is bufferbloat?","acceptedAnswer":{"@type":"Answer","text":"Excess latency caused by oversized network buffers. When a link saturates, packets queue in those buffers instead of being dropped, so delay climbs from milliseconds to hundreds of milliseconds while throughput stays high."}},{"@type":"Question","name":"How do I know if I have bufferbloat?","acceptedAnswer":{"@type":"Answer","text":"Run this test. If your latency under load is far above your idle latency — a grade of C or worse — you have it. The everyday sign is calls and games breaking specifically when someone else in the house is downloading."}},{"@type":"Question","name":"Does more bandwidth fix bufferbloat?","acceptedAnswer":{"@type":"Answer","text":"No. A faster plan fills its buffers just as completely, only faster. The fix is queue management, not capacity, which is why upgrading a plan so often fails to solve the problem people bought it to solve."}},{"@type":"Question","name":"What is a good bufferbloat grade?","acceptedAnswer":{"@type":"Answer","text":"A+ or A. That means under 30 ms of added latency while the link is saturated, which keeps real-time applications usable no matter what else is running."}}]}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/">WifiPlus</a>
+  <nav aria-label="Primary">
+    <a href="/">Full test</a>
+  </nav>
+</header>
+
+<main id="main">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Home</a></li>
+      <li aria-current="page">Bufferbloat test</li>
+    </ol>
+  </nav>
+
+  <article>
+    <h1>Bufferbloat test</h1>
+    <p class="standfirst">This is the measurement that explains why your call falls apart the moment someone else starts a download.</p>
+    <nav class="langs" aria-label="Other languages">
+    <span aria-current="true">English</span>
+    <a href="/es/test-de-bufferbloat/" hreflang="es" lang="es">Español</a>
+    <a href="/hi/bufferbloat-test/" hreflang="hi" lang="hi">हिन्दी</a>
+  </nav>
+
+    <!-- The live test. Same engine as the full tool: real bytes, no simulation.
+         Localised strings arrive as data attributes because CSP forbids inline
+         script, and landing.js reads them from here. -->
+    <section class="tool" aria-label="Bufferbloat test"
+      data-phase-ping="PING"
+      data-phase-download="DOWNLOAD"
+      data-phase-upload="UPLOAD"
+      data-status-latency="Measuring ping, jitter, packet loss and DNS…"
+      data-status-download="Measuring download and latency under load…"
+      data-status-upload="Measuring upload…"
+      data-status-failed="Test failed. Check your connection and try again."
+      data-label-again="AGAIN"
+      data-verdict-good="Your router keeps queues short. Calls and games hold up while other devices download."
+      data-verdict-queueing="Noticeable queueing. Enabling Smart Queue Management (SQM/fq_codel) on your router would fix this."
+      data-verdict-severe="Severe bufferbloat. Calls will break up whenever anyone else downloads — a router queue problem, not a speed problem.">
+      <div class="stage">
+        <button class="go" id="goButton" type="button">GO</button>
+        <p class="caption" id="goCaption">Press GO — about 6 seconds, no signup.</p>
+        <div class="readout" id="readout" hidden>
+          <p class="phase" id="phase">PING</p>
+          <p class="value"><span id="value">0.00</span> <span class="unit" id="unit">ms</span></p>
+          <div class="track"><span id="bar"></span></div>
+        </div>
+      </div>
+      <dl class="results" id="results" hidden>
+        <div><dt>Download</dt><dd id="rDownload">--<span>Mbps</span></dd></div>
+        <div><dt>Upload</dt><dd id="rUpload">--<span>Mbps</span></dd></div>
+        <div><dt>Ping</dt><dd id="rPing">--<span>ms</span></dd></div>
+        <div><dt>Jitter</dt><dd id="rJitter">--<span>ms</span></dd></div>
+        <div><dt>Packet loss</dt><dd id="rLoss">--<span>%</span></dd></div>
+        <div><dt>DNS</dt><dd id="rDns">--<span>ms</span></dd></div>
+        <div><dt>Bufferbloat</dt><dd id="rBloat">--<span>grade</span></dd></div>
+        <div><dt>Stability</dt><dd id="rStability">--<span>%</span></dd></div>
+      </dl>
+      <p class="status" id="status" role="status" aria-live="polite">Ready.</p>
+    </section>
+
+    <p>Bufferbloat is what happens when a network device holds on to far more data than it should. Memory is cheap, so routers and modems shipped with large buffers on the theory that holding packets is better than dropping them. The result is the opposite of what was intended: when the link fills, that buffer fills too, and every packet behind it waits in a queue that can be seconds deep.</p>
+    <p>The symptom is unmistakable once you know it. Everything is fine until someone starts a large upload or download, and then calls stutter, pages hang and games become unplayable — while a speed test run at the same moment still reports the full advertised speed. The bandwidth was never the problem. The queue was.</p>
+
+    <h2>How this test measures it</h2>
+    <p>Idle latency is measured first, on an unloaded connection. Then latency is probed again during the real download, while the link is genuinely saturated by the test's own traffic. The difference between those two medians is your bufferbloat, and it is graded from A+ (under 5 ms of added latency) to F (over 200 ms). Measuring during the actual download rather than a synthetic load means the result reflects a condition your connection really experiences.</p>
+
+    <h2>What the grade means for you</h2>
+    <p>A+ or A means your router keeps queues short and your calls will survive other people's downloads. B or C means noticeable queueing that you will feel during video calls. D or F means your latency multiplies under load — a 20 ms connection becoming 500 ms whenever anyone downloads — and no speed upgrade will fix it, because the constraint is the queue, not the capacity.</p>
+
+    <h2>How to fix it</h2>
+    <p>The fix is Smart Queue Management: an algorithm such as fq_codel or CAKE that keeps queues short and shares the link fairly between connections. Many modern routers include it under names like SQM, Smart Queues, Bufferbloat control or Adaptive QoS. OpenWrt supports it fully. Setting it up typically means enabling SQM and telling it your line's real speed, slightly under-declared so the queue forms in your router — where the smart algorithm controls it — rather than in your provider's equipment, where nothing does.</p>
+
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      <details><summary><h3>What is bufferbloat?</h3></summary><p>Excess latency caused by oversized network buffers. When a link saturates, packets queue in those buffers instead of being dropped, so delay climbs from milliseconds to hundreds of milliseconds while throughput stays high.</p></details>
+      <details><summary><h3>How do I know if I have bufferbloat?</h3></summary><p>Run this test. If your latency under load is far above your idle latency — a grade of C or worse — you have it. The everyday sign is calls and games breaking specifically when someone else in the house is downloading.</p></details>
+      <details><summary><h3>Does more bandwidth fix bufferbloat?</h3></summary><p>No. A faster plan fills its buffers just as completely, only faster. The fix is queue management, not capacity, which is why upgrading a plan so often fails to solve the problem people bought it to solve.</p></details>
+      <details><summary><h3>What is a good bufferbloat grade?</h3></summary><p>A+ or A. That means under 30 ms of added latency while the link is saturated, which keeps real-time applications usable no matter what else is running.</p></details>
+    </div>
+
+    <h2>Related tests</h2>
+    <ul class="related">
+        <li><a href="/ping-test/"><strong>Ping test</strong><span>Latency decides how responsive your connection feels. Speed does not.</span></a></li>
+        <li><a href="/jitter-test/"><strong>Jitter test</strong><span>Jitter is why a call breaks up on a connection whose speed test looks perfect.</span></a></li>
+        <li><a href="/wifi-speed-test/"><strong>WiFi speed test</strong><span>Measure what your wireless connection actually delivers right now — not what the plan promises.</span></a></li>
+    </ul>
+
+    <p class="cta"><a href="/">Run the full test — every metric in one pass →</a></p>
+  </article>
+</main>
+
+<footer class="bar foot">
+  <p>WifiPlus — real measurement, no signup, no ads.</p>
+</footer>
+
+<script type="module" src="/landing.js"></script>
+</body>
+</html>

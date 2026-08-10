@@ -1,0 +1,38 @@
+{
+  "name": "WifiPlus — Speed Test & WiFi Analyzer",
+  "short_name": "WifiPlus",
+  "description": "Real browser-based internet speed test, WiFi analyzer and global ISP comparison.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080b16",
+  "theme_color": "#080b16",
+  "orientation": "any",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Run speed test",
+      "url": "/#speed-test",
+      "description": "Measure download, upload, ping, jitter and packet loss"
+    },
+    {
+      "name": "Compare ISPs",
+      "url": "/#compare",
+      "description": "Compare providers by speed, price and reliability"
+    }
+  ]
+}

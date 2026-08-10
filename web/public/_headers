@@ -1,0 +1,44 @@
+# Security headers for Cloudflare Pages / Netlify. Copied verbatim into out/ by
+# the static export, since everything in public/ is emitted at the site root.
+#
+# GitHub Pages ignores this file — if you host there, put Cloudflare in front of
+# the domain and recreate these as Transform Rules, otherwise clickjacking and
+# HSTS protection stay off.
+
+/*
+  # Clickjacking: refuse to be embedded in any frame.
+  X-Frame-Options: DENY
+  # Force HTTPS for 2 years, including subdomains.
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  # Stop browsers guessing a response is a different type than declared.
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  # Deny hardware/location APIs the speed test never uses.
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  #
+  # CSP NOTE — this is looser than the old hand-written site, and deliberately so.
+  # A Next.js static export inlines its hydration bootstrap (`self.__next_f.push`)
+  # directly into the HTML, so `script-src` must allow 'unsafe-inline'. A nonce is
+  # not an option: nonces have to be generated per response, and there is no server
+  # here to generate one. If you need the strict policy back, either move to a
+  # Cloudflare Worker that injects a nonce and rewrites the HTML, or keep serving
+  # the legacy hand-written build.
+  #
+  # connect-src stays pinned to the three endpoints the app actually calls, so an
+  # injected script still cannot exfiltrate anywhere else.
+  #
+  # Deploying a self-hosted measurement edge (server/) means adding its origin to
+  # connect-src here AND in index.html's meta CSP at the repo root. A CSP block
+  # reaches fetch as an ordinary network error, so the server picker reads it as
+  # "host down", falls back to Cloudflare and reports nothing — the test keeps
+  # working and your edge is simply never selected.
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com https://wifiplus-router-analyzer.example.workers.dev; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+
+# Hashed build output is immutable — a changed file gets a new filename.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The service worker must never be cached, or updates never ship.
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate

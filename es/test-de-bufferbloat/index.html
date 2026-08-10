@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Test de Bufferbloat — Latencia bajo carga, de A+ a F | WifiPlus</title>
+<meta name="description" content="Test de bufferbloat gratuito: mide cuánto sube tu latencia mientras la conexión está saturada, con nota de A+ a F. Explica por qué se cortan las videollamadas.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="Pratham Gosai">
+<link rel="canonical" href="https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/">
+<link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/bufferbloat-test/">
+<link rel="alternate" hreflang="es" href="https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/">
+<link rel="alternate" hreflang="hi" href="https://wifiplus.prathamgosai.in/hi/bufferbloat-test/">
+<link rel="alternate" hreflang="x-default" href="https://wifiplus.prathamgosai.in/bufferbloat-test/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="WifiPlus">
+<meta property="og:locale" content="es">
+<meta property="og:url" content="https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/">
+<meta property="og:title" content="Test de Bufferbloat — Latencia bajo carga, de A+ a F | WifiPlus">
+<meta property="og:description" content="Test de bufferbloat gratuito: mide cuánto sube tu latencia mientras la conexión está saturada, con nota de A+ a F. Explica por qué se cortan las videollamadas.">
+<meta property="og:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Test de Bufferbloat — Latencia bajo carga, de A+ a F | WifiPlus">
+<meta name="twitter:description" content="Test de bufferbloat gratuito: mide cuánto sube tu latencia mientras la conexión está saturada, con nota de A+ a F. Explica por qué se cortan las videollamadas.">
+<meta name="twitter:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta name="theme-color" content="#071116">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/landing.css">
+<link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://cloudflare-dns.com">
+<link rel="modulepreload" href="/landing.js">
+<link rel="modulepreload" href="/core/measure.js">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/#webpage","url":"https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/","name":"Test de Bufferbloat — Latencia bajo carga, de A+ a F | WifiPlus","description":"Test de bufferbloat gratuito: mide cuánto sube tu latencia mientras la conexión está saturada, con nota de A+ a F. Explica por qué se cortan las videollamadas.","inLanguage":"es","isPartOf":{"@id":"https://wifiplus.prathamgosai.in/#website"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://wifiplus.prathamgosai.in/og-image.png"},"breadcrumb":{"@id":"https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Inicio","item":"https://wifiplus.prathamgosai.in/"},{"@type":"ListItem","position":2,"name":"Test de bufferbloat","item":"https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/"}]},{"@type":"WebApplication","name":"WifiPlus — Test de bufferbloat","url":"https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript and a modern browser","inLanguage":"es","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Person","name":"Pratham Gosai"}},{"@type":"FAQPage","@id":"https://wifiplus.prathamgosai.in/es/test-de-bufferbloat/#faq","inLanguage":"es","mainEntity":[{"@type":"Question","name":"¿Qué es el bufferbloat?","acceptedAnswer":{"@type":"Answer","text":"Latencia excesiva causada por búferes de red sobredimensionados. Cuando el enlace se satura, los paquetes se acumulan en esos búferes en lugar de descartarse, así que el retardo pasa de milisegundos a cientos de milisegundos mientras la velocidad sigue alta."}},{"@type":"Question","name":"¿Cómo sé si tengo bufferbloat?","acceptedAnswer":{"@type":"Answer","text":"Ejecuta esta prueba. Si tu latencia bajo carga es muy superior a la latencia en reposo — una nota de C o peor — lo tienes. La señal cotidiana es que las llamadas y los juegos fallan justo cuando alguien de casa está descargando."}},{"@type":"Question","name":"¿Contratar más velocidad soluciona el bufferbloat?","acceptedAnswer":{"@type":"Answer","text":"No. Una línea más rápida llena sus búferes igual de completamente, solo que antes. La solución es la gestión de colas, no la capacidad, y por eso subir de tarifa tan a menudo no resuelve el problema por el que se subió."}},{"@type":"Question","name":"¿Qué nota de bufferbloat es buena?","acceptedAnswer":{"@type":"Answer","text":"A+ o A. Significa menos de 30 ms añadidos con el enlace saturado, suficiente para que las aplicaciones en tiempo real sigan siendo usables pase lo que pase."}}]}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Ir al contenido</a>
+
+<header class="bar">
+  <a class="brand" href="/">WifiPlus</a>
+  <nav aria-label="Primary">
+    <a href="/">Test completo</a>
+  </nav>
+</header>
+
+<main id="main">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Inicio</a></li>
+      <li aria-current="page">Test de bufferbloat</li>
+    </ol>
+  </nav>
+
+  <article>
+    <h1>Test de bufferbloat</h1>
+    <p class="standfirst">Esta es la medición que explica por qué tu videollamada se rompe en cuanto alguien empieza a descargar.</p>
+    <nav class="langs" aria-label="Otros idiomas">
+    <a href="/bufferbloat-test/" hreflang="en" lang="en">English</a>
+    <span aria-current="true">Español</span>
+    <a href="/hi/bufferbloat-test/" hreflang="hi" lang="hi">हिन्दी</a>
+  </nav>
+
+    <!-- The live test. Same engine as the full tool: real bytes, no simulation.
+         Localised strings arrive as data attributes because CSP forbids inline
+         script, and landing.js reads them from here. -->
+    <section class="tool" aria-label="Test de bufferbloat"
+      data-phase-ping="PING"
+      data-phase-download="DESCARGA"
+      data-phase-upload="SUBIDA"
+      data-status-latency="Midiendo ping, jitter, pérdida de paquetes y DNS…"
+      data-status-download="Midiendo descarga y latencia bajo carga…"
+      data-status-upload="Midiendo subida…"
+      data-status-failed="La prueba falló. Revisa tu conexión e inténtalo de nuevo."
+      data-label-again="REPETIR"
+      data-verdict-good="Tu router mantiene las colas cortas. Las llamadas y los juegos aguantan mientras otros descargan."
+      data-verdict-queueing="Hay encolado apreciable. Activar la gestión inteligente de colas (SQM/fq_codel) en tu router lo resolvería."
+      data-verdict-severe="Bufferbloat severo. Las llamadas se cortarán cada vez que alguien descargue: es un problema de colas del router, no de velocidad.">
+      <div class="stage">
+        <button class="go" id="goButton" type="button">INICIAR</button>
+        <p class="caption" id="goCaption">Pulsa INICIAR — unos 6 segundos, sin registro.</p>
+        <div class="readout" id="readout" hidden>
+          <p class="phase" id="phase">PING</p>
+          <p class="value"><span id="value">0.00</span> <span class="unit" id="unit">ms</span></p>
+          <div class="track"><span id="bar"></span></div>
+        </div>
+      </div>
+      <dl class="results" id="results" hidden>
+        <div><dt>Descarga</dt><dd id="rDownload">--<span>Mbps</span></dd></div>
+        <div><dt>Subida</dt><dd id="rUpload">--<span>Mbps</span></dd></div>
+        <div><dt>Ping</dt><dd id="rPing">--<span>ms</span></dd></div>
+        <div><dt>Jitter</dt><dd id="rJitter">--<span>ms</span></dd></div>
+        <div><dt>Pérdida de paquetes</dt><dd id="rLoss">--<span>%</span></dd></div>
+        <div><dt>DNS</dt><dd id="rDns">--<span>ms</span></dd></div>
+        <div><dt>Bufferbloat</dt><dd id="rBloat">--<span>nota</span></dd></div>
+        <div><dt>Estabilidad</dt><dd id="rStability">--<span>%</span></dd></div>
+      </dl>
+      <p class="status" id="status" role="status" aria-live="polite">Listo.</p>
+    </section>
+
+    <p>El bufferbloat ocurre cuando un equipo de red retiene muchos más datos de los que debería. Como la memoria es barata, los routers y módems se fabricaron con búferes enormes, partiendo de la idea de que retener un paquete siempre es mejor que descartarlo. El resultado fue el contrario del buscado: cuando el enlace se llena, ese búfer también se llena, y cada paquete que llega después espera en una cola que puede durar segundos.</p>
+    <p>El síntoma es inconfundible una vez que lo reconoces. Todo funciona bien hasta que alguien inicia una descarga o una subida grande, y entonces las llamadas se entrecortan, las páginas se quedan colgadas y los juegos se vuelven injugables — mientras un test de velocidad ejecutado en ese mismo momento sigue mostrando toda la velocidad contratada. La banda ancha nunca fue el problema. La cola sí.</p>
+
+    <h2>Cómo lo mide esta prueba</h2>
+    <p>Primero se mide la latencia en reposo, con la conexión descargada. Después se vuelve a medir durante la descarga real, mientras el enlace está genuinamente saturado por el tráfico de la propia prueba. La diferencia entre esas dos medianas es tu bufferbloat, y se califica de A+ (menos de 5 ms añadidos) a F (más de 200 ms). Medir durante la descarga real y no con una carga artificial significa que el resultado refleja una situación que tu conexión vive de verdad.</p>
+
+    <h2>Qué significa cada nota</h2>
+    <p>A+ o A: tu router mantiene las colas cortas y tus llamadas sobrevivirán a las descargas de los demás. B o C: hay encolado apreciable y lo notarás en videollamadas. D o F: tu latencia se multiplica bajo carga — una conexión de 20 ms que pasa a 500 ms en cuanto alguien descarga — y ninguna mejora de velocidad lo va a arreglar, porque el límite es la cola, no la capacidad.</p>
+
+    <h2>Cómo solucionarlo</h2>
+    <p>La solución es la gestión inteligente de colas: un algoritmo como fq_codel o CAKE que mantiene las colas cortas y reparte el enlace de forma justa entre conexiones. Muchos routers modernos lo incluyen bajo nombres como SQM, Smart Queues, control de bufferbloat o QoS adaptativo, y OpenWrt lo soporta por completo. Configurarlo consiste en activar SQM e indicarle la velocidad real de tu línea, declarándola ligeramente por debajo para que la cola se forme en tu router —donde el algoritmo la controla— y no en el equipo de tu operador, donde no la controla nadie.</p>
+
+    <h2>Preguntas frecuentes</h2>
+    <div class="faq">
+      <details><summary><h3>¿Qué es el bufferbloat?</h3></summary><p>Latencia excesiva causada por búferes de red sobredimensionados. Cuando el enlace se satura, los paquetes se acumulan en esos búferes en lugar de descartarse, así que el retardo pasa de milisegundos a cientos de milisegundos mientras la velocidad sigue alta.</p></details>
+      <details><summary><h3>¿Cómo sé si tengo bufferbloat?</h3></summary><p>Ejecuta esta prueba. Si tu latencia bajo carga es muy superior a la latencia en reposo — una nota de C o peor — lo tienes. La señal cotidiana es que las llamadas y los juegos fallan justo cuando alguien de casa está descargando.</p></details>
+      <details><summary><h3>¿Contratar más velocidad soluciona el bufferbloat?</h3></summary><p>No. Una línea más rápida llena sus búferes igual de completamente, solo que antes. La solución es la gestión de colas, no la capacidad, y por eso subir de tarifa tan a menudo no resuelve el problema por el que se subió.</p></details>
+      <details><summary><h3>¿Qué nota de bufferbloat es buena?</h3></summary><p>A+ o A. Significa menos de 30 ms añadidos con el enlace saturado, suficiente para que las aplicaciones en tiempo real sigan siendo usables pase lo que pase.</p></details>
+    </div>
+
+    <h2>Pruebas relacionadas</h2>
+    <ul class="related">
+        <li><a href="/ping-test/"><strong>Ping test</strong><span>Latency decides how responsive your connection feels. Speed does not.</span></a></li>
+        <li><a href="/jitter-test/"><strong>Jitter test</strong><span>Jitter is why a call breaks up on a connection whose speed test looks perfect.</span></a></li>
+        <li><a href="/es/test-de-velocidad-wifi/"><strong>Test de velocidad WiFi</strong><span>Mide lo que tu conexión inalámbrica entrega de verdad ahora mismo, no lo que promete la tarifa.</span></a></li>
+    </ul>
+
+    <p class="cta"><a href="/">Ejecutar el test completo — todas las métricas de una vez →</a></p>
+  </article>
+</main>
+
+<footer class="bar foot">
+  <p>WifiPlus — medición real, sin registro, sin anuncios.</p>
+</footer>
+
+<script type="module" src="/landing.js"></script>
+</body>
+</html>

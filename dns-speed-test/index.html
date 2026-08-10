@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>DNS Speed Test — Measure Domain Resolution Time | WifiPlus</title>
+<meta name="description" content="Free DNS speed test measuring uncached domain resolution time. Slow DNS makes every site feel sluggish before a single byte of the page is requested.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="Pratham Gosai">
+<link rel="canonical" href="https://wifiplus.prathamgosai.in/dns-speed-test/">
+<link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/dns-speed-test/">
+<link rel="alternate" hreflang="x-default" href="https://wifiplus.prathamgosai.in/dns-speed-test/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="WifiPlus">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="https://wifiplus.prathamgosai.in/dns-speed-test/">
+<meta property="og:title" content="DNS Speed Test — Measure Domain Resolution Time | WifiPlus">
+<meta property="og:description" content="Free DNS speed test measuring uncached domain resolution time. Slow DNS makes every site feel sluggish before a single byte of the page is requested.">
+<meta property="og:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="DNS Speed Test — Measure Domain Resolution Time | WifiPlus">
+<meta name="twitter:description" content="Free DNS speed test measuring uncached domain resolution time. Slow DNS makes every site feel sluggish before a single byte of the page is requested.">
+<meta name="twitter:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta name="theme-color" content="#071116">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/landing.css">
+<link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://cloudflare-dns.com">
+<link rel="modulepreload" href="/landing.js">
+<link rel="modulepreload" href="/core/measure.js">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://wifiplus.prathamgosai.in/dns-speed-test/#webpage","url":"https://wifiplus.prathamgosai.in/dns-speed-test/","name":"DNS Speed Test — Measure Domain Resolution Time | WifiPlus","description":"Free DNS speed test measuring uncached domain resolution time. Slow DNS makes every site feel sluggish before a single byte of the page is requested.","inLanguage":"en","isPartOf":{"@id":"https://wifiplus.prathamgosai.in/#website"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://wifiplus.prathamgosai.in/og-image.png"},"breadcrumb":{"@id":"https://wifiplus.prathamgosai.in/dns-speed-test/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://wifiplus.prathamgosai.in/dns-speed-test/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://wifiplus.prathamgosai.in/"},{"@type":"ListItem","position":2,"name":"DNS speed test","item":"https://wifiplus.prathamgosai.in/dns-speed-test/"}]},{"@type":"WebApplication","name":"WifiPlus — DNS speed test","url":"https://wifiplus.prathamgosai.in/dns-speed-test/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript and a modern browser","inLanguage":"en","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Person","name":"Pratham Gosai"}},{"@type":"FAQPage","@id":"https://wifiplus.prathamgosai.in/dns-speed-test/#faq","inLanguage":"en","mainEntity":[{"@type":"Question","name":"What is a good DNS response time?","acceptedAnswer":{"@type":"Answer","text":"Under 20 ms is excellent, under 60 ms is normal, and above 100 ms is slow enough to notice on the first visit to any new site."}},{"@type":"Question","name":"Will changing DNS make my internet faster?","acceptedAnswer":{"@type":"Answer","text":"It will not raise your bandwidth. It reduces the delay before each new domain starts loading, which makes browsing feel faster even though the measured speed is unchanged."}},{"@type":"Question","name":"Why does this test use a random hostname?","acceptedAnswer":{"@type":"Answer","text":"To defeat caching. A domain you have visited before answers from cache almost instantly and tells you nothing about your resolver's real speed."}}]}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/">WifiPlus</a>
+  <nav aria-label="Primary">
+    <a href="/">Full test</a>
+  </nav>
+</header>
+
+<main id="main">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Home</a></li>
+      <li aria-current="page">DNS speed test</li>
+    </ol>
+  </nav>
+
+  <article>
+    <h1>DNS speed test</h1>
+    <p class="standfirst">Every page load starts with a DNS lookup. A slow resolver delays everything that follows.</p>
+    
+
+    <!-- The live test. Same engine as the full tool: real bytes, no simulation.
+         Localised strings arrive as data attributes because CSP forbids inline
+         script, and landing.js reads them from here. -->
+    <section class="tool" aria-label="DNS speed test"
+      data-phase-ping="PING"
+      data-phase-download="DOWNLOAD"
+      data-phase-upload="UPLOAD"
+      data-status-latency="Measuring ping, jitter, packet loss and DNS…"
+      data-status-download="Measuring download and latency under load…"
+      data-status-upload="Measuring upload…"
+      data-status-failed="Test failed. Check your connection and try again."
+      data-label-again="AGAIN"
+      data-verdict-good="Your router keeps queues short. Calls and games hold up while other devices download."
+      data-verdict-queueing="Noticeable queueing. Enabling Smart Queue Management (SQM/fq_codel) on your router would fix this."
+      data-verdict-severe="Severe bufferbloat. Calls will break up whenever anyone else downloads — a router queue problem, not a speed problem.">
+      <div class="stage">
+        <button class="go" id="goButton" type="button">GO</button>
+        <p class="caption" id="goCaption">Press GO — about 6 seconds, no signup.</p>
+        <div class="readout" id="readout" hidden>
+          <p class="phase" id="phase">PING</p>
+          <p class="value"><span id="value">0.00</span> <span class="unit" id="unit">ms</span></p>
+          <div class="track"><span id="bar"></span></div>
+        </div>
+      </div>
+      <dl class="results" id="results" hidden>
+        <div><dt>Download</dt><dd id="rDownload">--<span>Mbps</span></dd></div>
+        <div><dt>Upload</dt><dd id="rUpload">--<span>Mbps</span></dd></div>
+        <div><dt>Ping</dt><dd id="rPing">--<span>ms</span></dd></div>
+        <div><dt>Jitter</dt><dd id="rJitter">--<span>ms</span></dd></div>
+        <div><dt>Packet loss</dt><dd id="rLoss">--<span>%</span></dd></div>
+        <div><dt>DNS</dt><dd id="rDns">--<span>ms</span></dd></div>
+        <div><dt>Bufferbloat</dt><dd id="rBloat">--<span>grade</span></dd></div>
+        <div><dt>Stability</dt><dd id="rStability">--<span>%</span></dd></div>
+      </dl>
+      <p class="status" id="status" role="status" aria-live="polite">Ready.</p>
+    </section>
+
+    <p>Before your browser can request a page, it has to turn the domain name into an IP address. That lookup happens before anything else — before the connection, before the first byte, before any of the speed you pay for is involved at all. When it is slow, every site feels sluggish in a way no speed test explains.</p>
+    <p>This test measures an uncached lookup deliberately. It requests a randomly generated hostname so the answer cannot already be sitting in a cache, which means what you see is the true cost of a real recursive resolution rather than the near-zero time of a repeat lookup.</p>
+
+    <h2>Which resolver this actually times</h2>
+    <p>This test times a DNS-over-HTTPS lookup against Cloudflare's resolver at 1.1.1.1. It is not querying whichever resolver your operating system is configured to use, because a web page has no way to reach that: the browser gives JavaScript no access to the system resolver. So treat this as a reading of what a fast public resolver costs you from where you are sitting — a good benchmark for the network path and a fair comparison point, but not a verdict on your ISP's own DNS. If this number is good and browsing still feels slow to start, your configured resolver is worth testing separately from the command line with dig or nslookup.</p>
+
+    <h2>Why uncached is the honest measurement</h2>
+    <p>Measuring a domain you just visited tells you how fast your cache is, which is not useful — it will always be fast. The first visit to any new domain pays the full resolution cost, and a page pulling assets from several different hosts pays it several times over. That is the number that shapes how the web actually feels, so that is the one measured here.</p>
+
+    <h2>Reading the result</h2>
+    <p>Under 20 ms indicates a well-placed resolver and is what a good public DNS service delivers. 20-60 ms is normal. Above 100 ms is slow enough to be perceptible on every first visit to a site. Consistently high figures usually point at an ISP resolver that is overloaded or geographically distant.</p>
+
+    <h2>Changing your DNS resolver</h2>
+    <p>You are not required to use your provider's resolver. Cloudflare's 1.1.1.1, Google's 8.8.8.8 and Quad9's 9.9.9.9 are all free, and are frequently faster than an ISP's default. Change it once in your router and every device on the network benefits. Worth knowing before you switch: your resolver sees every domain you look up, so the choice is about privacy as much as speed — all three publish policies on what they log, and they differ.</p>
+
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      <details><summary><h3>What is a good DNS response time?</h3></summary><p>Under 20 ms is excellent, under 60 ms is normal, and above 100 ms is slow enough to notice on the first visit to any new site.</p></details>
+      <details><summary><h3>Will changing DNS make my internet faster?</h3></summary><p>It will not raise your bandwidth. It reduces the delay before each new domain starts loading, which makes browsing feel faster even though the measured speed is unchanged.</p></details>
+      <details><summary><h3>Why does this test use a random hostname?</h3></summary><p>To defeat caching. A domain you have visited before answers from cache almost instantly and tells you nothing about your resolver's real speed.</p></details>
+    </div>
+
+    <h2>Related tests</h2>
+    <ul class="related">
+        <li><a href="/ping-test/"><strong>Ping test</strong><span>Latency decides how responsive your connection feels. Speed does not.</span></a></li>
+        <li><a href="/wifi-speed-test/"><strong>WiFi speed test</strong><span>Measure what your wireless connection actually delivers right now — not what the plan promises.</span></a></li>
+        <li><a href="/packet-loss-test/"><strong>Packet loss test</strong><span>A connection can lose packets and still report a perfect download speed.</span></a></li>
+    </ul>
+
+    <p class="cta"><a href="/">Run the full test — every metric in one pass →</a></p>
+  </article>
+</main>
+
+<footer class="bar foot">
+  <p>WifiPlus — real measurement, no signup, no ads.</p>
+</footer>
+
+<script type="module" src="/landing.js"></script>
+</body>
+</html>

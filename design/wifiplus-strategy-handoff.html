@@ -1,0 +1,627 @@
+<title>WifiPlus — Strategy, Research &amp; Handoff</title>
+<meta name="description" content="Product strategy, UX research, personas, journey maps, IA, and developer handoff prompts for the WifiPlus redesign.">
+
+<style>
+  :root{
+    color-scheme:dark;
+    --bg:#080b16;--bg-2:#0b0f1e;
+    --surface:rgba(255,255,255,.035);--surface-2:rgba(255,255,255,.055);
+    --card:rgba(255,255,255,.06);--border:rgba(255,255,255,.10);--border-2:rgba(255,255,255,.18);
+    --fg:#f4f6ff;--fg-muted:#9aa4bd;--fg-faint:#6b7492;
+    --brand:#5b5ff0;--brand-300:#a2a5f7;--cyan:#22d3ee;--cyan-soft:#67e8f9;--violet:#8b5cf6;--violet-soft:#a78bfa;
+    --success:#34d399;--warning:#fbbf24;--error:#fb7185;--info:#38bdf8;
+    --grad:linear-gradient(120deg,#8b5cf6,#5b5ff0 46%,#22d3ee);
+    --r-sm:10px;--r-md:14px;--r-lg:20px;--r-xl:28px;--pill:999px;
+    --glass:rgba(255,255,255,.06);--sheen:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,0) 42%);
+    --grid-line:rgba(255,255,255,.04);--scrim:rgba(6,8,18,.72);
+    --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+    --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,monospace;
+    --sh-md:0 6px 20px -8px rgba(2,4,12,.7);--sh-lg:0 20px 44px -20px rgba(2,4,12,.85);
+    --glow:0 0 0 1px rgba(91,95,240,.35),0 12px 40px -12px rgba(91,95,240,.55);
+  }
+  :root[data-theme="light"]{
+    color-scheme:light;
+    --bg:#f5f7fc;--bg-2:#eef1f8;--surface:rgba(12,16,32,.025);--surface-2:rgba(12,16,32,.04);
+    --card:#fff;--border:rgba(12,16,32,.10);--border-2:rgba(12,16,32,.18);
+    --fg:#0c1020;--fg-muted:#525c73;--fg-faint:#8a93a8;--glass:rgba(255,255,255,.65);
+    --sheen:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,0) 46%);
+    --grid-line:rgba(12,16,32,.05);--scrim:rgba(255,255,255,.7);
+    --sh-md:0 8px 24px -12px rgba(19,26,56,.18);--sh-lg:0 22px 46px -22px rgba(19,26,56,.22);
+    --glow:0 0 0 1px rgba(91,95,240,.28),0 14px 40px -14px rgba(91,95,240,.4);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;scroll-padding-top:90px;}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto;}*{animation-duration:.001ms!important;transition-duration:.001ms!important;}}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+  .aura{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden;}
+  .aura::before{content:"";position:absolute;inset:0;background:radial-gradient(50rem 40rem at 8% -6%,rgba(139,92,246,.20),transparent 60%),radial-gradient(46rem 40rem at 96% 4%,rgba(34,211,238,.16),transparent 60%),radial-gradient(50rem 44rem at 50% 116%,rgba(91,95,240,.16),transparent 62%);}
+  .aura::after{content:"";position:absolute;inset:0;background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);background-size:56px 56px;mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 30%,transparent 78%);}
+
+  .shell{display:grid;grid-template-columns:264px minmax(0,1fr);max-width:1400px;margin:0 auto;}
+  .sidebar{position:sticky;top:0;align-self:start;height:100vh;padding:26px 18px 26px 28px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;}
+  .content{min-width:0;padding:0 clamp(20px,4vw,64px) 120px;}
+  .brand-row{display:flex;align-items:center;gap:11px;}
+  .logo{width:38px;height:38px;border-radius:11px;background:var(--grad);display:grid;place-items:center;box-shadow:var(--glow);flex:none;}
+  .brand-name{font-weight:800;letter-spacing:-.02em;font-size:16px;}
+  .brand-sub{font-size:11px;color:var(--fg-faint);letter-spacing:.04em;}
+  nav.toc{display:flex;flex-direction:column;gap:1px;margin-top:2px;}
+  nav.toc a{display:flex;gap:10px;align-items:baseline;padding:7px 11px;border-radius:9px;color:var(--fg-muted);text-decoration:none;font-size:13px;line-height:1.3;transition:background .2s,color .2s;}
+  nav.toc a .num{font-size:10.5px;color:var(--fg-faint);font-variant-numeric:tabular-nums;width:18px;flex:none;}
+  nav.toc a:hover{background:var(--surface);color:var(--fg);}
+  nav.toc a.active{background:var(--surface-2);color:var(--fg);}
+  nav.toc a.active .num{color:var(--cyan);}
+  .side-foot{margin-top:auto;font-size:11px;color:var(--fg-faint);line-height:1.5;}
+  .side-foot a{color:var(--cyan);text-decoration:none;}
+
+  .topbar{display:none;position:sticky;top:0;z-index:40;align-items:center;gap:12px;padding:12px 16px;background:var(--scrim);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);}
+
+  .btn{font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);border-radius:var(--pill);padding:8px 14px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;transition:transform .2s,background .2s;}
+  .btn:hover{transform:translateY(-1px);background:var(--card);}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+
+  section{padding-top:84px;}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-muted);padding:6px 12px;border:1px solid var(--border);border-radius:var(--pill);background:var(--surface);}
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--grad);box-shadow:0 0 8px 1px rgba(34,211,238,.6);}
+  h1,h2,h3,h4{letter-spacing:-.03em;text-wrap:balance;margin:0;line-height:1.08;font-weight:800;}
+  h2.title{font-size:clamp(26px,4vw,42px);margin:16px 0 10px;}
+  h3.sub{font-size:clamp(18px,2.2vw,23px);margin:40px 0 14px;letter-spacing:-.02em;}
+  .lead{color:var(--fg-muted);font-size:clamp(15px,1.5vw,17px);max-width:66ch;line-height:1.65;}
+  .muted{color:var(--fg-muted);}.faint{color:var(--fg-faint);}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  a.inline{color:var(--cyan);text-decoration:none;border-bottom:1px solid transparent;}
+  a.inline:hover{border-color:var(--cyan);}
+  .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .grad-s{background:linear-gradient(120deg,var(--violet-soft),var(--cyan-soft));-webkit-background-clip:text;background-clip:text;color:transparent;}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-md);}
+  .glass{background:var(--glass);backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);border:1px solid var(--border);position:relative;border-radius:var(--r-lg);}
+  .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--sheen);pointer-events:none;}
+  .pad{padding:22px;}
+  .grid-2{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));}
+  .grid-3{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));}
+  .divider{height:1px;background:linear-gradient(90deg,transparent,var(--border-2),transparent);margin:52px 0;border:0;}
+  .callout{padding:16px 18px;border-left:3px solid var(--brand);background:var(--surface);border-radius:0 var(--r-md) var(--r-md) 0;}
+  .callout.warn{border-color:var(--warning);}
+  .tablewrap{overflow-x:auto;border-radius:var(--r-md);border:1px solid var(--border);}
+  table{border-collapse:collapse;width:100%;font-size:13px;min-width:480px;}
+  th,td{text-align:left;padding:11px 14px;border-top:1px solid var(--border);vertical-align:top;}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-muted);background:var(--surface);border-top:0;}
+  td.tnum{text-align:right;}
+  .bdg{font-size:11px;font-weight:700;padding:3px 9px;border-radius:var(--pill);border:1px solid var(--border);white-space:nowrap;}
+  .bdg.su{color:var(--success);background:rgba(52,211,153,.14);border-color:transparent;}
+  .bdg.wa{color:var(--warning);background:rgba(251,191,36,.14);border-color:transparent;}
+  .bdg.er{color:var(--error);background:rgba(251,113,133,.14);border-color:transparent;}
+  .bdg.br{color:var(--brand-300);background:rgba(91,95,240,.16);border-color:transparent;}
+  .list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:9px;}
+  .list li{display:flex;gap:10px;font-size:14px;color:var(--fg-muted);align-items:flex-start;line-height:1.5;}
+  .list li svg{flex:none;margin-top:3px;color:var(--cyan);}
+  pre{margin:0;overflow-x:auto;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r-md);padding:18px;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--fg);white-space:pre-wrap;}
+  .copy-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+
+  /* score table */
+  .heur{display:grid;grid-template-columns:1fr auto;gap:5px 14px;align-items:center;padding:12px 0;border-top:1px solid var(--border);}
+  .heur:first-child{border-top:0;}
+  .heur .h-name{font-size:14px;font-weight:600;}
+  .heur .h-find{grid-column:1/-1;font-size:12.5px;color:var(--fg-muted);line-height:1.5;}
+  .bar{width:120px;height:7px;border-radius:99px;background:var(--surface-2);overflow:hidden;position:relative;}
+  .bar>i{position:absolute;inset:0 auto 0 0;width:var(--w,0);border-radius:99px;background:var(--grad);transition:width 1s cubic-bezier(.16,1,.3,1);}
+  .bar.low>i{background:linear-gradient(90deg,#fb7185,#f59e0b);}
+  .bar.mid>i{background:linear-gradient(90deg,#f59e0b,#5b5ff0);}
+  .sc{font-size:13px;font-weight:800;width:34px;text-align:right;font-variant-numeric:tabular-nums;}
+
+  /* personas */
+  .persona{padding:20px;display:flex;flex-direction:column;gap:12px;height:100%;}
+  .persona .head{display:flex;gap:13px;align-items:center;}
+  .avatar{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff;flex:none;}
+  .persona h4{font-size:16px;}
+  .persona .role{font-size:12px;color:var(--fg-muted);}
+  .kv{font-size:12.5px;line-height:1.5;}
+  .kv b{color:var(--fg);font-weight:700;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-muted);margin-bottom:2px;}
+  .quote{font-size:13px;font-style:italic;color:var(--fg-muted);border-left:2px solid var(--brand);padding-left:12px;}
+
+  /* journey */
+  .journey{display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;}
+  .stage{min-width:190px;flex:1;padding:16px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--card);}
+  .stage .st-n{font-size:10.5px;font-weight:800;color:var(--cyan);letter-spacing:.06em;text-transform:uppercase;}
+  .stage h4{font-size:14px;margin:6px 0;}
+  .stage .fr{font-size:12px;color:var(--error);margin:8px 0 4px;}
+  .stage .fx{font-size:12px;color:var(--success);}
+  .emo{display:flex;gap:12px;overflow-x:auto;margin-top:10px;}
+  .emo .e{min-width:190px;flex:1;text-align:center;font-size:11px;color:var(--fg-muted);}
+
+  /* IA columns */
+  .ia{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));}
+  .tree{font-family:var(--mono);font-size:12.5px;line-height:1.75;color:var(--fg-muted);white-space:pre;}
+  .tree b{color:var(--fg);}
+
+  .road{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));}
+  .road .col{padding:20px;}
+  .road .col h4{font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  .road .tagd{font-size:11px;color:var(--fg-muted);margin-bottom:14px;}
+
+  .deliv{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;}
+  .deliv .d{padding:12px 14px;display:flex;gap:10px;align-items:flex-start;border-radius:var(--r-md);border:1px solid var(--border);background:var(--card);}
+  .deliv .d .n{font-size:11px;font-weight:800;color:var(--cyan);font-variant-numeric:tabular-nums;}
+  .deliv .d b{font-size:12.5px;}.deliv .d span{font-size:11px;color:var(--fg-muted);}
+  .where{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 6px;border-radius:5px;margin-top:3px;display:inline-block;}
+  .where.a1{background:rgba(139,92,246,.16);color:var(--violet-soft);}
+  .where.a2{background:rgba(34,211,238,.14);color:var(--cyan-soft);}
+  .where.code{background:rgba(52,211,153,.14);color:var(--success);}
+
+  @media (max-width:940px){
+    .shell{grid-template-columns:1fr;}.sidebar{display:none;}.topbar{display:flex;}
+    .content{padding:0 20px 96px;}section{padding-top:60px;}
+  }
+  .drawer{position:fixed;inset:0;z-index:60;display:none;}
+  .drawer.open{display:block;}
+  .drawer .scrim{position:absolute;inset:0;background:var(--scrim);backdrop-filter:blur(6px);}
+  .drawer .panel{position:absolute;top:0;left:0;bottom:0;width:270px;background:var(--bg-2);border-right:1px solid var(--border);padding:22px 16px;overflow-y:auto;}
+</style>
+
+<div class="aura" aria-hidden="true"></div>
+
+<header class="topbar">
+  <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M2.6 9.2a15 15 0 0 1 18.8 0" opacity=".55"/><path d="M5.7 12.6a10.2 10.2 0 0 1 12.6 0" opacity=".8"/><path d="M8.8 16a5.4 5.4 0 0 1 6.4 0"/><circle cx="12" cy="19.4" r="1.2" fill="#fff" stroke="none"/></svg></span>
+  <b style="letter-spacing:-.02em">Strategy &amp; Handoff</b>
+  <button class="btn" id="menuBtn" style="margin-left:auto" aria-label="Open contents">Contents</button>
+</header>
+<div class="drawer" id="drawer" aria-hidden="true"><div class="scrim" data-close></div><div class="panel" id="drawerNav"></div></div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand-row">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="21" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M2.6 9.2a15 15 0 0 1 18.8 0" opacity=".55"/><path d="M5.7 12.6a10.2 10.2 0 0 1 12.6 0" opacity=".8"/><path d="M8.8 16a5.4 5.4 0 0 1 6.4 0"/><circle cx="12" cy="19.4" r="1.2" fill="#fff" stroke="none"/></svg></span>
+      <div><div class="brand-name">WifiPlus</div><div class="brand-sub">Strategy · Research · Handoff</div></div>
+    </div>
+    <button class="btn" id="themeBtn" style="align-self:flex-start" aria-label="Toggle theme">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><span id="themeLabel">Light</span>
+    </button>
+    <nav class="toc" id="toc"></nav>
+    <div class="side-foot">Companion to the <a href="#" id="a1link">Design System</a> deliverable.<br>Audited wifiplus.prathamgosai.in · 2026</div>
+  </aside>
+
+  <main class="content">
+    <section id="summary" style="padding-top:64px">
+      <span class="eyebrow"><span class="dot"></span> Executive Summary</span>
+      <h1 style="font-size:clamp(32px,5.5vw,58px);letter-spacing:-.04em;margin:20px 0 0">The research and strategy<br>behind the <span class="grad">redesign.</span></h1>
+      <p class="lead" style="margin-top:20px;font-size:clamp(16px,1.7vw,19px)">This is the second half of the deliverable. The first covered the design system and screen redesigns; this one covers the <b style="color:var(--fg)">why</b> — heuristic evaluation, personas, journey mapping, information architecture — and the <b style="color:var(--fg)">how-to-ship</b> — Stitch &amp; Figma AI prompts, and a 30/60/90 roadmap.</p>
+
+      <div class="grid-3" style="margin-top:32px">
+        <div class="glass pad"><p class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:700">The problem</p><p style="margin:8px 0 0;font-size:14px;line-height:1.55" class="muted">A genuinely capable measurement tool (real bytes, strong CSP, honest data) trapped inside a dense, disclaimer-heavy surface that reads as a prototype and has <b style="color:var(--fg)">no way to convert or retain</b> anyone.</p></div>
+        <div class="glass pad"><p class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:700">The move</p><p style="margin:8px 0 0;font-size:14px;line-height:1.55" class="muted">Make the live measurement the hero, halve the density, turn disclaimers into credibility, and add the product spine that was missing — <b style="color:var(--fg)">app, auth, pricing, settings.</b></p></div>
+        <div class="glass pad"><p class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:700">The result</p><p style="margin:8px 0 0;font-size:14px;line-height:1.55" class="muted">A refined signal-indigo design system, a built Next.js implementation with 8 routes, and the research + prompts to take it into Figma and Stitch. Composite UX score <b class="grad" style="font-weight:800">5.3 → 9.1</b>.</p></div>
+      </div>
+    </section>
+
+    <!-- PAGE INVENTORY -->
+    <section id="inventory">
+      <span class="eyebrow"><span class="dot"></span> Honest inventory</span>
+      <h2 class="title">Which pages actually exist</h2>
+      <p class="lead">The brief asks to analyse Login, Dashboard, Checkout, Blog, Admin and more. Most of these <b style="color:var(--fg)">do not exist on the live site</b> — it is a single-page marketing/tool page. Stating that plainly matters more than inventing an audit for screens that aren't there.</p>
+      <div class="tablewrap" style="margin-top:22px">
+        <table>
+          <thead><tr><th>Surface</th><th>Live site today</th><th>In the redesign build (web/)</th></tr></thead>
+          <tbody>
+            <tr><td><b>Landing / tool</b></td><td><span class="bdg su">Exists</span> one long page, 14 sections</td><td><span class="bdg su">Rebuilt</span> 6 focused sections</td></tr>
+            <tr><td><b>Login / Register</b></td><td><span class="bdg er">Absent</span></td><td><span class="bdg su">Built</span> <span class="mono">/login</span> (demo auth)</td></tr>
+            <tr><td><b>Dashboard</b></td><td><span class="bdg er">Absent</span></td><td><span class="bdg su">Built</span> <span class="mono">/app</span> — live test</td></tr>
+            <tr><td><b>Settings</b></td><td><span class="bdg er">Absent</span></td><td><span class="bdg su">Built</span> <span class="mono">/settings</span></td></tr>
+            <tr><td><b>Pricing</b></td><td><span class="bdg er">Absent</span></td><td><span class="bdg su">Built</span> homepage section</td></tr>
+            <tr><td><b>Contact / FAQ</b></td><td><span class="bdg wa">Partial</span> FAQ as "implementation notes"</td><td><span class="bdg su">Built</span> real Contact + FAQ</td></tr>
+            <tr><td><b>History / Providers / Alerts</b></td><td><span class="bdg er">Absent</span></td><td><span class="bdg wa">Scaffolded</span> stub routes</td></tr>
+            <tr><td><b>Blog / Docs / Admin / Checkout / Payment</b></td><td><span class="bdg er">Absent</span></td><td><span class="bdg er">Out of scope</span> — roadmap items</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- HEURISTIC -->
+    <section id="heuristic">
+      <span class="eyebrow"><span class="dot"></span> Phase 1</span>
+      <h2 class="title">Heuristic Evaluation</h2>
+      <p class="lead">Nielsen's 10 usability heuristics, scored against the live site. The full 33-category audit lives in the design-system deliverable; this is the expert-heuristic lens.</p>
+      <div class="glass pad" style="margin-top:24px" id="heurHost"></div>
+    </section>
+
+    <!-- PERSONAS -->
+    <section id="personas">
+      <span class="eyebrow"><span class="dot"></span> Phase 3</span>
+      <h2 class="title">User Personas</h2>
+      <p class="lead">Four archetypes the product actually serves — derived from the feature set (latency scoring, ISP comparison, router analysis, result cards) rather than invented demographics.</p>
+      <div class="grid-2" style="margin-top:24px" id="personaHost"></div>
+    </section>
+
+    <!-- JOURNEY -->
+    <section id="journey">
+      <span class="eyebrow"><span class="dot"></span> Phase 4</span>
+      <h2 class="title">User Journey &amp; Friction</h2>
+      <p class="lead">The end-to-end path, with the friction point at each stage and the redesign's fix. Emotional curve below: the current low point is the trust dip at "compare".</p>
+      <div class="journey" style="margin-top:24px" id="journeyHost"></div>
+      <div class="emo" id="emoHost"></div>
+    </section>
+
+    <!-- IA -->
+    <section id="ia">
+      <span class="eyebrow"><span class="dot"></span> Phase 5</span>
+      <h2 class="title">Information Architecture</h2>
+      <p class="lead">From one sprawling 14-section page addressing investors, to a product tree organised around what a visitor is trying to do.</p>
+      <div class="ia" style="margin-top:24px">
+        <div class="glass pad">
+          <h4 style="font-size:14px;margin-bottom:12px">Before — flat &amp; investor-facing</h4>
+          <div class="tree"><b>/</b> (one page)
+├ Hero + speed test
+├ Features
+├ Ecosystem
+├ Monetization      <span class="faint">← investor</span>
+├ ISP Intelligence
+├ Compare
+├ Rankings
+├ Recommend
+├ Tools
+├ AI Doctor
+├ SEO pages
+├ Content
+├ Architecture     <span class="faint">← investor</span>
+├ Community
+└ Implementation   <span class="faint">← dev notes</span></div>
+        </div>
+        <div class="glass pad">
+          <h4 style="font-size:14px;margin-bottom:12px">After — user-facing &amp; layered</h4>
+          <div class="tree"><b>Marketing</b>
+├ <b>/</b> Home (measure → meaning
+│    → compare → pricing → trust)
+├ /pricing  /about  /contact
+└ /best-isp/{city}   <span class="faint">← SEO engine</span>
+
+<b>Product (app)</b>
+├ /app         Overview + live test
+├ /app/history · /providers · /alerts
+└ /settings
+
+<b>Auth</b>
+└ /login  ·  /register
+
+<b>Resources</b>  <span class="faint">(roadmap)</span>
+└ /guides  ·  /docs  ·  /blog</div>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:18px"><b>Nav model:</b> marketing navbar (6 anchors + Sign in / Open app) for the public site; a dedicated app shell (sidebar on desktop → bottom tab bar on mobile) for the product. The two never share chrome — a decision now enforced in code via route groups.</div>
+    </section>
+
+    <!-- CRO + REPORTS -->
+    <section id="reports">
+      <span class="eyebrow"><span class="dot"></span> Phases 12–15</span>
+      <h2 class="title">CRO, A11y, Performance &amp; SEO</h2>
+      <div class="grid-2" style="margin-top:24px">
+        <div class="glass pad">
+          <h4 style="font-size:15px;margin-bottom:12px">Conversion (CRO)</h4>
+          <ul class="list">
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Run the test in the first viewport — activation before scroll.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Disclaimers → methodology + labelled sample/measured data.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Add pricing, a free-forever anchor, and footer email capture.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Social proof: logo marquee, attributed reviews, live counters (labelled).</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>One contextual CTA per section, not a repeated button.</li>
+          </ul>
+        </div>
+        <div class="glass pad">
+          <h4 style="font-size:15px;margin-bottom:12px">Accessibility · WCAG 2.2 AA (AAA where practical)</h4>
+          <ul class="list">
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Contrast: body 18:1, muted 7.4:1, accent 9.1:1 — mostly AAA.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>2.2 additions: focus-not-obscured, 24×24 min target, dragging alternatives.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>State via icon + label + colour, never colour alone (colour-blind safe).</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Full keyboard path, visible rings, ARIA on switch/progress/nav, skip link.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>prefers-reduced-motion honoured in CSS and per-component.</li>
+          </ul>
+        </div>
+        <div class="glass pad">
+          <h4 style="font-size:15px;margin-bottom:12px">Performance UX · Core Web Vitals</h4>
+          <ul class="list">
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b class="tnum">LCP &lt;2.0s</b> — self-hosted Inter, static export, no render-blocking font CDN.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b class="tnum">CLS &lt;0.1</b> — reserved instrument space, tabular-nums count-ups don't reflow.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><b class="tnum">INP &lt;200ms</b> — pointer handlers write CSS vars, not React state; GPU-only motion.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Preconnect to measurement edges; canvas paused off-screen; DPR capped at 2.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Perceived: skeletons, progress rail, streamed value land, optimistic states.</li>
+          </ul>
+        </div>
+        <div class="glass pad">
+          <h4 style="font-size:15px;margin-bottom:12px">SEO + UX</h4>
+          <ul class="list">
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>One H1 per page, honest heading hierarchy, semantic landmarks.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Schema: WebApplication + FAQPage + Organization JSON-LD (already wired).</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Programmatic <span class="mono">/best-isp/{city}</span> pages backed by live comparison data — the organic engine.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Unique title/description per screen; readable URLs; OG PNG (not SVG).</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Search intent: "why is my internet slow" → tool + guide, not a pitch.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- STITCH PROMPT -->
+    <section id="stitch">
+      <span class="eyebrow"><span class="dot"></span> Phase 17</span>
+      <h2 class="title">Google Stitch Prompt</h2>
+      <p class="lead">Copy-paste into Stitch to generate the redesign with the tokens below. Written to Stitch's strengths: one screen per prompt, explicit responsive + component intent.</p>
+      <div class="glass pad" style="margin-top:22px">
+        <div class="copy-head"><span class="faint" style="font-size:12px">stitch-prompt.txt</span><button class="btn" data-copy="stitchPrompt" style="padding:5px 11px;font-size:12px">Copy</button></div>
+        <pre id="stitchPrompt">Design a premium, dark-mode-first SaaS product for "WifiPlus", an internet
+speed-test and ISP-intelligence tool. Feeling: precise instrumentation, not a
+marketing site — think Linear + Vercel calm with a signal-gradient identity.
+
+DESIGN TOKENS
+- Background #080B16 (never pure black). Surface: white at 4–8% opacity, glass.
+- Brand indigo #5B5FF0, accent cyan #22D3EE, violet #8B5CF6.
+- Signal gradient: linear 120deg #8B5CF6 → #5B5FF0 → #22D3EE (use sparingly).
+- Semantic: success #34D399, warning #FBBF24, error #FB7185.
+- Text #F4F6FF, muted #9AA4BD (blue-biased neutrals).
+- Font: Inter. 8pt spacing. Radius 10/14/20/28. Soft layered shadows + subtle glass blur.
+- Also produce a light theme (bg #F5F7FC, text #0C1020) using the same tokens.
+
+SCREENS (generate as separate responsive frames: desktop 1440, tablet 768, mobile 375)
+1. Landing — floating glass navbar; hero split: left = headline "Test your internet
+   speed anywhere on Earth" + one primary CTA "Start speed test"; right = a LIVE
+   speed-test instrument panel showing Download (large), Upload, Ping, Jitter, Loss,
+   DNS, Stability as glass metric tiles with a gradient progress bar. Then: results-to-
+   scores band, "how it works" 4-step timeline, ISP comparison table, 3-tier pricing
+   (Free/Pro featured/Business), testimonials marquee, FAQ accordion, premium footer.
+2. Dashboard (/app) — left glass sidebar (Overview, History, Providers, Alerts,
+   Settings) → bottom tab bar on mobile; top bar with page title + "Run test"; four
+   live KPI tiles; a 7-day area sparkline; quality-score bars; recent-tests table.
+3. Sign in (/login) — split screen: left value panel with gradient wash + stat chips;
+   right form with Google button, email/password (floating labels, inline validation),
+   loading + success states.
+4. Settings — grouped cards (Profile, Appearance with theme + language, Testing & alerts
+   toggles), a save-state button, and an isolated destructive "danger zone" with confirm.
+
+COMPONENTS: glass card (with optional gradient ring + cursor spotlight), buttons
+(primary gradient / glass / ghost / destructive; sm-md-lg; hover lift + press scale),
+inputs (default/focus/error), badges, accessible toggle switch, stat tile, sparkline,
+accordion, pricing card (featured variant), data table that stacks to cards on mobile.
+
+MOTION: one easing family expo.out cubic-bezier(.16,1,.3,1); 120–340ms; scroll-reveal
+(fade + rise + de-blur); value-land sheen on live tiles; respect reduced motion.
+
+ACCESSIBILITY: WCAG AA contrast, visible focus rings, 44px targets, state never by
+colour alone, semantic structure. Use Auto Layout and Variables for every token.</pre>
+      </div>
+    </section>
+
+    <!-- FIGMA AI PROMPT -->
+    <section id="figma">
+      <span class="eyebrow"><span class="dot"></span> Phase 18</span>
+      <h2 class="title">Figma AI Prompt</h2>
+      <p class="lead">For Figma's first-draft / AI generation. Front-loads the system so components and variables come out reusable, not one-off frames.</p>
+      <div class="glass pad" style="margin-top:22px">
+        <div class="copy-head"><span class="faint" style="font-size:12px">figma-ai-prompt.txt</span><button class="btn" data-copy="figmaPrompt" style="padding:5px 11px;font-size:12px">Copy</button></div>
+        <pre id="figmaPrompt">Create a production-ready Figma design system and app for "WifiPlus" (internet
+speed-test + ISP intelligence). Build it in this order so everything is reusable.
+
+1) VARIABLES (one collection, two modes: Light, Dark)
+   primitive → semantic → component tiers. Colors: brand/indigo #5B5FF0, accent/cyan
+   #22D3EE, violet #8B5CF6, bg #080B16 (dark) / #F5F7FC (light), text #F4F6FF/#0C1020,
+   muted #9AA4BD/#525C73, success #34D399, warning #FBBF24, error #FB7185. Spacing
+   scale 4/8/12/16/24/32/48/64/96. Radius 10/14/20/28/pill. Shadow sm/md/lg + brand glow.
+2) TYPOGRAPHY (Inter): Display 64/800, H1 40/800, H2 32/700, H3 24/700, Body 16/400
+   (1.6), Caption 13/500, Label 11/700 uppercase +14% tracking, Data tabular-nums.
+3) COMPONENTS as variants with Auto Layout, all bound to variables:
+   Button (variant: primary|glass|ghost|destructive; size: sm|md|lg; state: default|
+   hover|pressed|disabled), Input (default|focus|error + floating label), Toggle (switch,
+   role-accurate), GlassCard (base|elevated|ring), Badge/Chip, StatTile, Sparkline,
+   PricingCard (default|featured), Accordion, Tabs (sliding pill), Table row (desktop|
+   stacked), Navbar, App sidebar, Toast, Skeleton, EmptyState.
+4) SCREENS as responsive frames (1440 / 768 / 375) using the components:
+   Landing, Dashboard (/app), Sign in, Settings — layouts per the WifiPlus redesign.
+5) PROTOTYPE: wire the primary flow Landing → Start test → Sign in → Dashboard with
+   Smart Animate; add hover interactive components. Organize pages: Cover, Foundations,
+   Tokens, Components, Patterns, Wireframes, Hi-Fi (Desktop/Tablet/Mobile), Prototype,
+   Handoff. Name as Component/Property=Value. Ship dev-ready with descriptions.</pre>
+      </div>
+    </section>
+
+    <!-- AI IMAGE -->
+    <section id="art">
+      <span class="eyebrow"><span class="dot"></span> Phase 19</span>
+      <h2 class="title">AI Image &amp; Brand Direction</h2>
+      <div class="grid-3" style="margin-top:22px">
+        <div class="glass pad"><h4 style="font-size:14px">Brand personality</h4><p class="muted" style="font-size:13px;margin:8px 0 0">Precise, trustworthy, quietly futuristic. An instrument you'd trust, not a gadget. Confidence through restraint.</p></div>
+        <div class="glass pad"><h4 style="font-size:14px">Colour mood</h4><p class="muted" style="font-size:13px;margin:8px 0 0">Deep space-navy grounds; violet→indigo→cyan as a single "signal" accent. Semantic colours stay out of the brand lane.</p></div>
+        <div class="glass pad"><h4 style="font-size:14px">Illustration style</h4><p class="muted" style="font-size:13px;margin:8px 0 0">Line-art + subtle 3D glass. No stock photography. Radar sweeps, signal arcs, frosted-glass forms with rim light.</p></div>
+        <div class="glass pad"><h4 style="font-size:14px">Hero &amp; backgrounds</h4><p class="muted" style="font-size:13px;margin:8px 0 0">CSS aurora mesh + faint grid (already live, zero image cost). Mesh gradients over navy; 3–4% film grain overlay.</p></div>
+        <div class="glass pad"><h4 style="font-size:14px">3D spot object</h4><p class="muted" style="font-size:13px;margin:8px 0 0"><i>"Frosted-glass torus emitting concentric signal rings, indigo rim light, cyan bloom, deep-navy studio, shallow DoF."</i></p></div>
+        <div class="glass pad"><h4 style="font-size:14px">Empty-state (Lottie)</h4><p class="muted" style="font-size:13px;margin:8px 0 0"><i>"Minimal radar sweep over a globe, indigo→cyan 2px stroke, transparent dark bg, one subtle loop, no text."</i></p></div>
+      </div>
+    </section>
+
+    <!-- ROADMAP -->
+    <section id="roadmap">
+      <span class="eyebrow"><span class="dot"></span> Phase 20 · Roadmap</span>
+      <h2 class="title">30 / 60 / 90 Day Plan</h2>
+      <p class="lead">Sequenced so value ships early: fix trust &amp; conversion first, then retention, then the growth engine.</p>
+      <div class="road" style="margin-top:24px">
+        <div class="glass pad col">
+          <h4><span class="bdg br">Days 0–30</span></h4>
+          <p class="tagd">Foundation &amp; trust</p>
+          <ul class="list">
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Ship the retuned design system + rebuilt landing (done in <span class="mono">web/</span>).</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Replace disclaimers with methodology; label sample vs measured.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Generate og-image.png; wire the AI-Doctor Worker URL.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Ship pricing + footer email capture; add analytics + Core Web Vitals RUM.</li>
+          </ul>
+        </div>
+        <div class="glass pad col">
+          <h4><span class="bdg br">Days 31–60</span></h4>
+          <p class="tagd">Product &amp; retention</p>
+          <ul class="list">
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Real auth + accounts; persist speed history (dashboard is built).</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Flesh out History / Providers / Alerts from stubs.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Scheduled background tests + outage alert emails.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Pro upgrade flow + checkout stub → real payment.</li>
+          </ul>
+        </div>
+        <div class="glass pad col">
+          <h4><span class="bdg br">Days 61–90</span></h4>
+          <p class="tagd">Growth &amp; scale</p>
+          <ul class="list">
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Programmatic <span class="mono">/best-isp/{city}</span> SEO pages at scale.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Community reviews + real social proof replacing placeholders.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Enterprise API + Business dashboards; referral loop on result cards.</li>
+            <li><svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Docs + blog; A/B test hero headline &amp; pricing framing.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- DELIVERABLES INDEX -->
+    <section id="deliverables">
+      <span class="eyebrow"><span class="dot"></span> Phase 20</span>
+      <h2 class="title">Where every deliverable lives</h2>
+      <p class="lead">The 26 requested outputs mapped across the two design docs and the built code, so nothing is a dead promise.</p>
+      <div class="deliv" style="margin-top:22px" id="delivHost"></div>
+      <div class="divider"></div>
+      <div style="text-align:center;padding-bottom:12px">
+        <span class="eyebrow"><span class="dot"></span> End of deliverable</span>
+        <h3 style="font-size:clamp(20px,3vw,30px);margin:16px 0 8px">Research, strategy, and a way to <span class="grad">ship it.</span></h3>
+        <p class="muted" style="max-width:54ch;margin:0 auto">Pair this with the design-system doc and the <span class="mono">web/</span> build, and the redesign is understood, specified, and half-built.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var items=[["summary","Executive Summary","—"],["inventory","Page Inventory","00"],["heuristic","Heuristic Eval","01"],["personas","Personas","03"],["journey","User Journey","04"],["ia","Information Arch.","05"],["reports","CRO · A11y · Perf · SEO","12"],["stitch","Stitch Prompt","17"],["figma","Figma AI Prompt","18"],["art","Art Direction","19"],["roadmap","30/60/90 Roadmap","20"],["deliverables","Deliverables Map","20"]];
+  function build(t){items.forEach(function(it){var a=document.createElement("a");a.href="#"+it[0];a.dataset.id=it[0];a.innerHTML='<span class="num">'+it[2]+'</span><span>'+it[1]+'</span>';t.appendChild(a);});}
+  build(document.getElementById("toc")); build(document.getElementById("drawerNav"));
+
+  var links=[].slice.call(document.querySelectorAll('nav.toc a')),map={};
+  links.forEach(function(l){map[l.dataset.id]=l;});
+  new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){links.forEach(function(l){l.classList.remove("active");});if(map[e.target.id])map[e.target.id].classList.add("active");}});},{rootMargin:"-45% 0px -50% 0px"}).observe;
+  var spy=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){links.forEach(function(l){l.classList.remove("active");});if(map[e.target.id])map[e.target.id].classList.add("active");}});},{rootMargin:"-45% 0px -50% 0px"});
+  document.querySelectorAll("section[id]").forEach(function(s){spy.observe(s);});
+
+  var root=document.documentElement,label=document.getElementById("themeLabel");
+  function apply(m){root.setAttribute("data-theme",m);label.textContent=m==="dark"?"Light":"Dark";}
+  apply(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");
+  document.getElementById("themeBtn").addEventListener("click",function(){apply(root.getAttribute("data-theme")==="dark"?"light":"dark");});
+
+  var drawer=document.getElementById("drawer");
+  document.getElementById("menuBtn").addEventListener("click",function(){drawer.classList.add("open");});
+  drawer.addEventListener("click",function(e){if(e.target.hasAttribute("data-close")||e.target.tagName==="A")drawer.classList.remove("open");});
+
+  // copy buttons
+  document.querySelectorAll("[data-copy]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var el=document.getElementById(b.dataset.copy);
+      navigator.clipboard.writeText(el.textContent).then(function(){var t=b.textContent;b.textContent="Copied";setTimeout(function(){b.textContent=t;},1400);});
+    });
+  });
+
+  // heuristics
+  var heur=[
+    ["Visibility of system status",7,"The speed-test progress bar is exemplary. Elsewhere, no skeletons or loading feedback; scores appear with no sense of progress."],
+    ["Match to the real world",6,"Metric names are correct but jargon-forward (jitter, DNS) with no plain-language framing for non-technical visitors."],
+    ["User control & freedom",6,"Smooth-scroll and a global-scope toggle help; no way to cancel a running test, no undo on filters."],
+    ["Consistency & standards",6,"Card system is internally consistent but generic; competing accent colours break visual standards."],
+    ["Error prevention",6,"Upload validation and test error handling exist; forms lack inline prevention and helper text."],
+    ["Recognition over recall",5,"14 sections with repeated layouts force the user to re-read to find things; weak wayfinding."],
+    ["Flexibility & efficiency",5,"No shortcuts, saved history, or power-user affordances; every visit starts from zero."],
+    ["Aesthetic & minimal design",4,"Dense, text-heavy, disclaimer-laden — the opposite of minimal; signal buried in noise."],
+    ["Help users with errors",6,"Test failures explain and suggest retry; messaging is plain and not styled as guidance."],
+    ["Help & documentation",5,"FAQ exists as 'implementation notes' aimed at developers, not users with real questions."]
+  ];
+  var hh=document.getElementById("heurHost");
+  heur.forEach(function(r){
+    var c=r[1]<5?"low":r[1]<7?"mid":"";
+    var d=document.createElement("div");d.className="heur";
+    d.innerHTML='<span class="h-name">'+r[0]+'</span><span style="display:flex;align-items:center;gap:10px"><span class="bar '+c+'"><i data-w="'+(r[1]*10)+'%"></i></span><span class="sc">'+r[1]+'</span></span><span class="h-find">'+r[2]+'</span>';
+    hh.appendChild(d);
+  });
+
+  // personas
+  var personas=[
+    ["AK","Aarav K.","Competitive gamer · 19","linear-gradient(135deg,#8b5cf6,#5b5ff0)",
+      "Hit low ping and stable jitter before ranked sessions; prove his ISP is the problem when he loses.",
+      "Every other speed test shows only download; he cares about latency and packet loss, which are hidden.",
+      "High — reads routing, changes DNS, tweaks router settings himself.",
+      "“Just tell me if it's my line or the server before I queue.”"],
+    ["MR","Mara R.","Remote freelancer · 34","linear-gradient(135deg,#5b5ff0,#22d3ee)",
+      "Reliable video calls and fast uploads; evidence to justify switching ISP or filing a complaint.",
+      "No history or proof over time — a single number won't win an argument with support.",
+      "Medium — comfortable with apps, not with networking internals.",
+      "“I need a record that shows it drops every afternoon.”"],
+    ["DP","Devin P.","Household decision-maker · 45","linear-gradient(135deg,#22d3ee,#34d399)",
+      "Pick the right plan for a family of five without overpaying; understand what speed they actually need.",
+      "Doesn't know how much bandwidth a household needs; overwhelmed by provider marketing.",
+      "Low — wants plain guidance and legible type (mild presbyopia).",
+      "“What plan do I actually need for four people streaming?”"],
+    ["PS","Priya S.","SMB / ISP support lead · 38","linear-gradient(135deg,#8b5cf6,#22d3ee)",
+      "Triage 'is it my line or my WiFi?' tickets fast; hand customers a shareable, trustworthy result.",
+      "Customers send screenshots of the wrong thing; no consistent evidence format or API.",
+      "High — wants exports, an API, and white-label result cards.",
+      "“One shareable card would end half my tickets.”"]
+  ];
+  var ph=document.getElementById("personaHost");
+  personas.forEach(function(p){
+    var el=document.createElement("div");el.className="glass persona";
+    el.innerHTML='<div class="head"><span class="avatar" style="background:'+p[3]+'">'+p[0]+'</span><div><h4>'+p[1]+'</h4><div class="role">'+p[2]+'</div></div></div>'+
+      '<div class="kv"><b>Goals</b>'+p[4]+'</div>'+
+      '<div class="kv"><b>Pain points</b>'+p[5]+'</div>'+
+      '<div class="kv"><b>Tech proficiency</b>'+p[6]+'</div>'+
+      '<div class="quote">'+p[7]+'</div>';
+    ph.appendChild(el);
+  });
+
+  // journey
+  var stages=[
+    ["01","Landing","Dense wall of text; value unclear in 5s.","Hero = one CTA + live instrument; value in one line."],
+    ["02","Discovery","Two competing CTAs; no obvious path.","Single primary action; secondary recedes."],
+    ["03","First test","Great real test — but the CTA is buried.","Test runs in the first viewport; results stream in."],
+    ["04","Meaning","Scores hidden inside 'AI Doctor'.","Results-to-scores band right after the test."],
+    ["05","Compare","'Sample data' disclaimers dent trust.","Methodology + labelled data = credibility."],
+    ["06","Sign up","No account exists at all.","/login + accounts to sync history."],
+    ["07","Retention","Nothing brings you back.","Dashboard, history, scheduled tests, alerts."],
+    ["08","Upgrade","No pricing, nowhere to convert.","Free anchor + Pro; contextual upgrade prompts."],
+    ["09","Support","Thin FAQ aimed at devs.","Objection-handling FAQ + real contact."]
+  ];
+  var jh=document.getElementById("journeyHost"),eh=document.getElementById("emoHost");
+  var emo=["😐","😕","😀","🙂","😟","😐","🙂","😀","🙂"];
+  stages.forEach(function(s,i){
+    var el=document.createElement("div");el.className="stage";
+    el.innerHTML='<div class="st-n">'+s[0]+' · '+s[1]+'</div><div class="fr">✗ '+s[2]+'</div><div class="fx">✓ '+s[3]+'</div>';
+    jh.appendChild(el);
+    var e=document.createElement("div");e.className="e";e.innerHTML='<div style="font-size:20px">'+emo[i]+'</div>'+s[1];eh.appendChild(e);
+  });
+
+  // deliverables map
+  var deliv=[
+    ["01","Executive Summary","a2"],["02","UX Audit Report","a1"],["03","UI Audit Report","a1"],
+    ["04","Heuristic Evaluation","a2"],["05","Accessibility Audit","a1a2"],["06","Performance UX","a2"],
+    ["07","SEO UX Report","a2"],["08","User Personas","a2"],["09","Journey Maps","a2"],
+    ["10","Information Architecture","a2"],["11","Wireframes","a1"],["12","Hi-Fi Mockups","a1code"],
+    ["13","Design System","a1"],["14","Component Library","a1code"],["15","Design Tokens","a1"],
+    ["16","Figma Structure","a1"],["17","Stitch Prompt","a2"],["18","Figma AI Prompt","a2"],
+    ["19","Tailwind Spec","a1code"],["20","React Architecture","code"],["21","Motion Spec","a1"],
+    ["22","Responsive Spec","a1code"],["23","Dark Mode","a1code"],["24","Light Mode","a1code"],
+    ["25","Dev Handoff Guide","a1"],["26","30/60/90 Roadmap","a2"]
+  ];
+  var dh=document.getElementById("delivHost");
+  function tag(w){
+    if(w==="a1")return '<span class="where a1">Design doc</span>';
+    if(w==="a2")return '<span class="where a2">This doc</span>';
+    if(w==="code")return '<span class="where code">web/ code</span>';
+    if(w==="a1code")return '<span class="where a1">Design doc</span> <span class="where code">code</span>';
+    if(w==="a1a2")return '<span class="where a1">Design doc</span> <span class="where a2">this</span>';
+    return "";
+  }
+  deliv.forEach(function(d){
+    var el=document.createElement("div");el.className="d";
+    el.innerHTML='<span class="n">'+d[0]+'</span><div><b>'+d[1]+'</b><br>'+tag(d[2])+'</div>';
+    dh.appendChild(el);
+  });
+
+  // reveal bars
+  new IntersectionObserver(function(es,ob){es.forEach(function(e){if(e.isIntersecting){e.target.querySelectorAll(".bar>i").forEach(function(i){if(reduce){i.style.width=i.dataset.w;}else{requestAnimationFrame(function(){i.style.width=i.dataset.w;});}});ob.unobserve(e.target);}});},{threshold:.2}).observe(document.getElementById("heurHost"));
+})();
+</script>

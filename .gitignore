@@ -1,0 +1,14 @@
+# Wrangler puts local secrets here (including ANTHROPIC_API_KEY) — never commit it.
+.dev.vars
+.dev.vars.*
+
+node_modules/
+.wrangler/
+
+# og-image.png IS committed. It used to be ignored with a note saying to
+# regenerate it by hand — nobody ever did, so every social share rendered a
+# blank card. Regenerate with: node scripts/build-og.mjs
+
+.DS_Store
+Thumbs.db
+dev-server*.log

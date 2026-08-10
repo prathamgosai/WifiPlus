@@ -1,0 +1,21 @@
+# Runs ONE edge instance. To build a real multi-region network, deploy this
+# stack (or the image) once per region on a host in that region, each with its
+# own REGION/SERVER_NAME/.env, and put NGINX or Cloudflare in front for TLS +
+# HTTP/2/3. There is no way to make a single box measure from seven cities.
+services:
+  speedtest-edge:
+    build: .
+    image: wifiplus/speedtest-server:latest
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 512M

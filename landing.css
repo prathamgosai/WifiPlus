@@ -1,0 +1,409 @@
+/**
+ * Landing-page styles.
+ *
+ * Deliberately one small external stylesheet rather than inline CSS per page:
+ * six generated pages sharing one cached file beats six copies of the same
+ * bytes, and Core Web Vitals are a ranking signal.
+ *
+ * Readability is the whole job here — these pages exist to be read and to rank,
+ * so the measure is capped, the type scale is generous and contrast clears
+ * WCAG AA in both themes.
+ */
+
+:root {
+  color-scheme: dark;
+  --bg: #071116;
+  --panel: rgba(255, 255, 255, 0.06);
+  --ink: #f5fbff;
+  --muted: #b3c2cd;
+  --line: rgba(255, 255, 255, 0.16);
+  --teal: #24d1c3;
+  --blue: #57a6ff;
+  --amber: #f6b64b;
+  --coral: #f36d5d;
+  --space: 8px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f6f3ea;
+    --panel: rgba(255, 255, 255, 0.8);
+    --ink: #101820;
+    --muted: #46535f;
+    --line: rgba(17, 24, 39, 0.16);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--space);
+  left: var(--space);
+  z-index: 10;
+  transform: translateY(-200%);
+  background: var(--teal);
+  color: #041113;
+  border-radius: var(--space);
+  padding: 10px 14px;
+  font-weight: 800;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* Visible focus everywhere — keyboard users must never lose their place. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--teal);
+  outline-offset: 3px;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space) * 2);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding: calc(var(--space) * 2) calc(var(--space) * 3);
+}
+
+.bar.foot {
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+  margin-top: calc(var(--space) * 8);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.brand {
+  font-weight: 900;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.bar nav {
+  display: flex;
+  gap: calc(var(--space) * 2);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+main {
+  max-width: 74ch;
+  margin: 0 auto;
+  padding: calc(var(--space) * 4) calc(var(--space) * 3) calc(var(--space) * 6);
+}
+
+.crumbs ol {
+  display: flex;
+  gap: var(--space);
+  list-style: none;
+  margin: 0 0 calc(var(--space) * 3);
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.crumbs li + li::before {
+  content: "/";
+  margin-right: var(--space);
+  opacity: 0.6;
+}
+
+h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin: 0 0 calc(var(--space) * 2);
+}
+
+h2 {
+  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin: calc(var(--space) * 6) 0 calc(var(--space) * 2);
+}
+
+h3 {
+  font-size: 1.02rem;
+  margin: 0;
+  display: inline;
+}
+
+p {
+  margin: 0 0 calc(var(--space) * 2);
+}
+
+.standfirst {
+  font-size: 1.2rem;
+  color: var(--muted);
+  margin-bottom: calc(var(--space) * 4);
+}
+
+/* Language switcher. Present only where a translation exists, so it never
+   promises a language the reader would land on in English. */
+.langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  margin: 0 0 calc(var(--space) * 4);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.langs a,
+.langs span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 14px;
+  text-decoration: none;
+}
+
+.langs span[aria-current] {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.langs a:hover {
+  border-color: var(--teal);
+}
+
+/* ---- The live test ------------------------------------------------------ */
+.tool {
+  border: 1px solid var(--line);
+  border-radius: calc(var(--space) * 1.5);
+  background: radial-gradient(120% 120% at 50% 0%, #10151c, #05070a 70%);
+  padding: calc(var(--space) * 3);
+  margin: 0 0 calc(var(--space) * 5);
+  color: #f5fbff;
+}
+
+.stage {
+  display: grid;
+  place-items: center;
+  gap: calc(var(--space) * 2);
+  min-height: 200px;
+}
+
+.go {
+  width: 150px;
+  height: 150px;
+  border: 2px solid var(--blue);
+  border-radius: 50%;
+  background: #05070a;
+  color: #fff;
+  font: inherit;
+  font-size: 2rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.go.small {
+  width: 96px;
+  height: 96px;
+  font-size: 1.1rem;
+}
+
+.go:hover {
+  transform: scale(1.04);
+}
+
+.go[hidden],
+.caption[hidden],
+.readout[hidden],
+.results[hidden] {
+  display: none;
+}
+
+.caption {
+  color: #9aa3b4;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.readout {
+  width: 100%;
+  text-align: center;
+}
+
+.phase {
+  color: var(--teal);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  margin: 0;
+}
+
+.value {
+  font-size: clamp(2.4rem, 8vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin: var(--space) 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.value .unit {
+  font-size: 1rem;
+  color: #9aa3b4;
+}
+
+.track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.track span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue), var(--teal));
+  transition: width 0.15s linear;
+}
+
+.results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: calc(var(--space) * 1.5);
+  margin: calc(var(--space) * 3) 0 0;
+}
+
+.results div {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--space);
+  padding: calc(var(--space) * 1.5);
+}
+
+.results dt {
+  color: #9aa3b4;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.results dd {
+  margin: 6px 0 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.results dd span {
+  margin-left: 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #9aa3b4;
+}
+
+.status {
+  color: #b9c3cf;
+  font-size: 0.9rem;
+  margin: calc(var(--space) * 2) 0 0;
+}
+
+.lead-metric {
+  display: none;
+}
+
+/* ---- FAQ, links --------------------------------------------------------- */
+.faq details {
+  border-bottom: 1px solid var(--line);
+  padding: calc(var(--space) * 2) 0;
+}
+
+.faq summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq summary::after {
+  content: "+";
+  float: right;
+  color: var(--muted);
+}
+
+.faq details[open] summary::after {
+  content: "–";
+}
+
+.faq p {
+  margin: var(--space) 0 0;
+  color: var(--muted);
+}
+
+.related {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: calc(var(--space) * 1.5);
+}
+
+.related a {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: var(--space);
+  padding: calc(var(--space) * 2);
+  text-decoration: none;
+  background: var(--panel);
+}
+
+.related a:hover {
+  border-color: var(--teal);
+}
+
+.related strong {
+  display: block;
+}
+
+.related span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.cta {
+  margin-top: calc(var(--space) * 5);
+  font-weight: 800;
+}
+
+.cta a {
+  color: var(--teal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .go,
+  .track span {
+    transition: none;
+  }
+}

@@ -1,0 +1,28 @@
+# Line endings.
+#
+# Without this, Windows checkouts (core.autocrlf=true) get CRLF in the working
+# tree while the generators in scripts/ write LF — so every run of
+# `npm run build:seo` reported ten modified files that differed only in
+# invisible characters, and the CI check that the committed pages match a fresh
+# build could never pass locally.
+#
+# Normalising to LF everywhere also keeps the repo byte-identical between the
+# Windows machine it is developed on and the Linux runners that build it.
+* text=auto eol=lf
+
+# Binary: never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Generated. Marked so a diff of a regenerated page collapses in review rather
+# than burying a real content change under a thousand lines of template.
+/es/**/index.html linguist-generated=true
+/hi/**/index.html linguist-generated=true
+/*-test/index.html linguist-generated=true
+sitemap.xml linguist-generated=true

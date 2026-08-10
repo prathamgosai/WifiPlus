@@ -1,0 +1,2684 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- script-src has no 'unsafe-inline': all JS lives in app.js and there are no inline
+       handlers, so injected <script> cannot execute. style-src keeps it only because a few
+       elements still use style="" attributes. connect-src is pinned to the two measurement
+       endpoints, so injected code cannot exfiltrate anywhere else.
+       frame-ancestors/HSTS are header-only — see _headers. -->
+  <!-- connect-src is the allow-list of every host the test may measure against.
+       Deploying a self-hosted edge (see server/README.md) means adding its origin
+       HERE as well, or the browser blocks the requests. A CSP block reaches fetch
+       as an ordinary network error, so the picker reads it as "server down",
+       falls back to Cloudflare and says nothing — the test keeps working and your
+       edge is simply never used. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com https://wifiplus-router-analyzer.example.workers.dev; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>WifiPlus — Internet Speed Test, WiFi Analyzer, Ping &amp; Bufferbloat</title>
+  <meta name="description" content="Free internet speed test and WiFi analyzer for download, upload, ping, jitter, packet loss, DNS and bufferbloat. Real browser results, no signup.">
+  <meta name="keywords" content="WifiPlus, Wifi Plus, WiFi Plus speed test, internet speed test, WiFi analyzer, ISP comparison, fastest ISP, broadband speed checker, ping test, jitter test, packet loss test, fiber availability, AI WiFi Doctor">
+  <meta name="theme-color" content="#071116">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <meta name="googlebot" content="index,follow">
+  <meta name="author" content="Pratham Gosai">
+  <meta property="og:title" content="WifiPlus — Internet Speed Test, WiFi Analyzer, Ping &amp; Bufferbloat">
+  <meta property="og:description" content="Measure download, upload, ping, jitter, packet loss, DNS and bufferbloat in your browser. Real results, no app, no signup.">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:site_name" content="WifiPlus">
+  <meta property="og:url" content="https://wifiplus.prathamgosai.in/">
+  <!-- Must be PNG/JPEG at 1200x630. Facebook, X, LinkedIn, WhatsApp and Slack all
+       refuse to render an SVG og:image — an SVG here means no preview card at all.
+       Generate og-image.png from og-image.svg: npx sharp-cli -i og-image.svg -o og-image.png resize 1200 630 -->
+  <meta property="og:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="WifiPlus — internet speed test and WiFi analyzer">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="WifiPlus — Internet Speed Test &amp; WiFi Analyzer">
+  <meta name="twitter:description" content="Real browser speed testing for download, upload, ping, jitter, packet loss, DNS and bufferbloat. Free, no signup.">
+  <meta name="twitter:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+  <meta name="twitter:image:alt" content="WifiPlus — internet speed test and WiFi analyzer">
+  <link rel="canonical" href="https://wifiplus.prathamgosai.in/">
+  <link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/">
+  <link rel="alternate" hreflang="x-default" href="https://wifiplus.prathamgosai.in/">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WifiPlus">
+  <meta name="application-name" content="WifiPlus">
+  <meta name="format-detection" content="telephone=no">
+  <!-- The speed test fires at these origins the moment a user hits Start; warming the
+       TLS handshake up front removes ~100-300ms from the first measurement (helps INP). -->
+  <link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cloudflare-dns.com" crossorigin>
+  <link rel="dns-prefetch" href="https://speed.cloudflare.com">
+  <!-- app.js is an ES module that imports the shared engine from core/. Preloading
+       the modules it pulls in removes the request waterfall that would otherwise
+       delay the first paint of the dial by one round trip per module. -->
+  <link rel="modulepreload" href="app.js">
+  <link rel="modulepreload" href="core/measure.js">
+  <link rel="modulepreload" href="core/endpoints.js">
+  <link rel="modulepreload" href="core/netinfo.js">
+  <link rel="modulepreload" href="core/scoring.js">
+  <link rel="modulepreload" href="core/history.js">
+  <link rel="modulepreload" href="core/permalink.js">
+  <link rel="modulepreload" href="core/gauge.js">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "WifiPlus",
+    "alternateName": ["Wifi Plus", "WiFi Plus", "WifiPlus Speed Test"],
+    "url": "https://wifiplus.prathamgosai.in/",
+    "logo": "https://wifiplus.prathamgosai.in/icon.svg",
+    "description": "AI-powered internet intelligence platform for speed testing, ISP comparisons, routing diagnostics, outage monitoring, and telecom insights.",
+    "founder": { "@type": "Person", "name": "Pratham Gosai", "url": "https://prathamgosai.in/" },
+    "sameAs": ["https://prathamgosai.in/", "https://github.com/prathamgosai/WifiPlus"]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "WifiPlus",
+    "alternateName": ["Wifi Plus", "WiFi Plus", "WifiPlus Speed Test", "WifiPlus Internet Speed Test"],
+    "url": "https://wifiplus.prathamgosai.in/",
+    "description": "Free AI internet speed test, WiFi analyzer, and global ISP comparison platform.",
+    "inLanguage": "en",
+    "publisher": { "@type": "Organization", "name": "WifiPlus" },
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": { "@type": "EntryPoint", "urlTemplate": "https://wifiplus.prathamgosai.in/?q={search_term_string}" },
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "WifiPlus",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": ["Windows", "macOS", "Linux", "iOS", "Android"],
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "description": "The AI-powered internet intelligence platform for measuring speed, diagnosing WiFi issues, comparing ISPs, and monitoring outages.",
+    "url": "https://wifiplus.prathamgosai.in/",
+    "browserRequirements": "Requires JavaScript and a modern browser.",
+    "author": { "@type": "Person", "name": "Pratham Gosai", "url": "https://prathamgosai.in/" }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is WifiPlus?",
+        "acceptedAnswer": { "@type": "Answer", "text": "WifiPlus is a free AI-powered internet speed test and WiFi analyzer. It measures download, upload, ping, jitter, packet loss, and DNS latency, then compares your result against internet providers worldwide." }
+      },
+      {
+        "@type": "Question",
+        "name": "Is the WifiPlus speed test free?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. The WifiPlus speed test is completely free and requires no signup, app install, or account." }
+      },
+      {
+        "@type": "Question",
+        "name": "How are real speed tests measured?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Download and upload throughput are measured by moving real bytes over parallel HTTP streams against the nearest Cloudflare edge, discarding the first half-second while the congestion window ramps. Ping, jitter, and packet loss come from repeated timed probes, and DNS latency comes from uncached DNS-over-HTTPS lookups." }
+      },
+      {
+        "@type": "Question",
+        "name": "Can WifiPlus support 200+ countries?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes by design. The data model stores country, state, city, ISP, plan, review, speed result, coverage, and ranking entities. The included dataset is representative seed data for the prototype." }
+      },
+      {
+        "@type": "Question",
+        "name": "Does WifiPlus work offline as an app?",
+        "acceptedAnswer": { "@type": "Answer", "text": "WifiPlus is an installable progressive web app. Service worker offline caching works when the site is hosted over HTTPS or localhost." }
+      }
+    ]
+  }
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071116;
+      --bg-soft: #0c1b22;
+      --panel: rgba(255, 255, 255, 0.08);
+      --panel-solid: #10222b;
+      --paper: #ffffff;
+      --ink: #f5fbff;
+      --muted: #a8b8c2;
+      --line: rgba(255, 255, 255, 0.16);
+      --strong-line: rgba(255, 255, 255, 0.28);
+      --teal: #24d1c3;
+      --green: #62d26f;
+      --amber: #f6b64b;
+      --coral: #f36d5d;
+      --blue: #57a6ff;
+      --violet: #a98cff;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+    }
+
+    html[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f6f3ea;
+      --bg-soft: #ece6d8;
+      --panel: rgba(255, 255, 255, 0.72);
+      --panel-solid: #fffdf8;
+      --paper: #101820;
+      --ink: #121820;
+      --muted: #536171;
+      --line: rgba(17, 24, 39, 0.16);
+      --strong-line: rgba(17, 24, 39, 0.28);
+      --shadow: 0 20px 55px rgba(27, 34, 43, 0.13);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100dvh;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body.menu-open {
+      overflow: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button,
+    a,
+    input,
+    select,
+    textarea {
+      touch-action: manipulation;
+    }
+
+    button,
+    select {
+      cursor: pointer;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      min-height: 44px;
+    }
+
+    img,
+    canvas {
+      display: block;
+      max-width: 100%;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      transform: translateY(-160%);
+      border-radius: 8px;
+      background: var(--teal);
+      color: #041113;
+      padding: 10px 14px;
+      font-weight: 800;
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .top-ribbon {
+      border-bottom: 1px solid var(--line);
+      background: var(--bg-soft);
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-align: center;
+      padding: 7px 16px;
+    }
+
+    .top-ribbon a {
+      color: var(--teal);
+      font-weight: 900;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--bg) 86%, transparent);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav-wrap {
+      width: min(1240px, calc(100% - 32px));
+      min-height: 70px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      font-weight: 900;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border: 2px solid currentColor;
+      border-radius: 8px;
+      position: relative;
+      flex: 0 0 auto;
+      overflow: hidden;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 2px solid currentColor;
+      border-bottom: 0;
+    }
+
+    .brand-mark::before {
+      width: 24px;
+      height: 14px;
+      bottom: 8px;
+      border-radius: 18px 18px 0 0;
+    }
+
+    .brand-mark::after {
+      width: 12px;
+      height: 7px;
+      bottom: 8px;
+      border-radius: 14px 14px 0 0;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 750;
+    }
+
+    .nav-links a:hover,
+    .nav-links a:focus-visible {
+      color: var(--ink);
+    }
+
+    .nav-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .select-small,
+    .icon-button {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+    }
+
+    .select-small {
+      max-width: 128px;
+      padding: 0 10px;
+      font-weight: 750;
+    }
+
+    .icon-button {
+      width: 42px;
+      display: inline-grid;
+      place-items: center;
+      font-weight: 900;
+    }
+
+    .icon-button span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      margin: 3px auto;
+      background: currentColor;
+    }
+
+    #menuButton {
+      display: none;
+    }
+
+    .button {
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 0 18px;
+      background: var(--teal);
+      color: #031314;
+      font-weight: 900;
+      box-shadow: 0 16px 40px rgba(36, 209, 195, 0.23);
+      transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+    }
+
+    .button.secondary {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--strong-line);
+      box-shadow: none;
+    }
+
+    .button.danger {
+      border-color: color-mix(in srgb, var(--coral) 60%, var(--line));
+      color: var(--coral);
+    }
+
+    .button.dark {
+      background: var(--ink);
+      color: var(--bg);
+      box-shadow: none;
+    }
+
+    /* `display: inline-flex` above outranks the user-agent's `[hidden] {
+       display: none }`, so a button marked hidden in the markup rendered anyway.
+       That is how "Stop Test" sat under an idle page offering to stop a test
+       that was not running. Any styled element that can be hidden needs this. */
+    .button[hidden] {
+      display: none;
+    }
+
+    .button[disabled] {
+      opacity: 0.68;
+      cursor: wait;
+      transform: none;
+    }
+
+    .hero {
+      position: relative;
+      min-height: calc(100vh - 20px);
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .hero-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.88;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, color-mix(in srgb, var(--bg) 96%, transparent) 0%, color-mix(in srgb, var(--bg) 72%, transparent) 52%, color-mix(in srgb, var(--bg) 91%, transparent) 100%),
+        linear-gradient(180deg, transparent 0%, var(--bg) 98%);
+    }
+
+    /* Start-aligned, and no forced viewport height. Centring the columns
+       against a test panel that is much taller than the copy pushed the
+       headline hundreds of pixels down the page, and the min-height stretched
+       the single row so the same centring opened a gap even before the panel
+       loaded. The copy now begins directly under the header. */
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      width: min(1240px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 62px 0 76px;
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+      align-items: start;
+      gap: 48px;
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: var(--teal);
+      font-size: 0.78rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin-bottom: 18px;
+      font-size: clamp(3rem, 6.8vw, 6.5rem);
+      line-height: 0.94;
+      letter-spacing: 0;
+    }
+
+    .hero-copy {
+      max-width: 680px;
+      color: var(--muted);
+      font-size: clamp(1.02rem, 2vw, 1.22rem);
+    }
+
+    .hero-actions,
+    .test-actions,
+    .share-actions,
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .hero-actions {
+      margin-top: 28px;
+    }
+
+    .platform-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 800;
+      backdrop-filter: blur(16px);
+    }
+
+    .trust-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .trust-strip span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--panel-solid) 70%, transparent);
+      padding: 0 12px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 850;
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 34px;
+      max-width: 760px;
+    }
+
+    .stat-pill {
+      min-height: 82px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 13px;
+      backdrop-filter: blur(16px);
+    }
+
+    .stat-pill strong {
+      display: block;
+      font-size: clamp(1.35rem, 2vw, 1.9rem);
+      line-height: 1;
+    }
+
+    .stat-pill span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 750;
+    }
+
+    .test-lab {
+      display: grid;
+      gap: 14px;
+    }
+
+    /* ---- Connection identity strip ----------------------------------- */
+    .conn-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+    }
+
+    .conn-key {
+      display: block;
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .conn-val {
+      display: block;
+      margin-top: 6px;
+      font-size: 0.95rem;
+      font-weight: 850;
+      overflow-wrap: anywhere;
+    }
+
+    .conn-sub {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 650;
+      overflow-wrap: anywhere;
+    }
+
+    /* ---- GO button + live gauge -------------------------------------- */
+    /* Deliberately dark: the dial is the focal surface of the page, and a
+       dark stage makes the sweeping arc read at a glance the way a physical
+       instrument does. */
+    /* ---- GO button + live gauge -------------------------------------- */
+    /* Everything here is built from the same tokens as the rest of the page, so
+       the dial belongs to the site rather than sitting on it as a black slab.
+       That also fixes a real bug: the tick numerals and readout used to be
+       hardcoded near-white, which was only legible because the stage forced a
+       dark background behind them — on the light theme they were invisible. */
+    .gauge-stage {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      min-height: 340px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background:
+        radial-gradient(120% 120% at 50% 12%, color-mix(in srgb, var(--teal) 12%, transparent), transparent 62%),
+        var(--panel);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+    }
+
+    .go-button {
+      position: relative;
+      width: 190px;
+      height: 190px;
+      border: 0;
+      border-radius: 50%;
+      background: var(--panel-solid);
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      box-shadow: var(--shadow);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    /* Brand ring, drawn as a masked border so it never affects layout. */
+    .go-button::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      padding: 2px;
+      background: conic-gradient(from 200deg, var(--teal), var(--blue), var(--violet), var(--teal));
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      mask-composite: exclude;
+    }
+
+    /* Once a result exists the dial stays on screen, so the button steps down
+       to a secondary "run it again" control. */
+    .go-button.compact { width: 108px; height: 108px; font-size: 1.25rem; }
+    .go-button:hover { transform: scale(1.04); box-shadow: 0 0 0 6px color-mix(in srgb, var(--teal) 14%, transparent); }
+    .go-button:active { transform: scale(0.97); }
+    .go-button[hidden] { display: none; }
+
+    .go-caption {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .go-caption[hidden] { display: none; }
+
+    .gauge {
+      width: min(100%, 380px);
+      display: grid;
+      place-items: center;
+    }
+
+    .gauge[hidden] { display: none; }
+    .gauge svg { width: 100%; height: auto; }
+
+    .gauge-track {
+      fill: none;
+      stroke: color-mix(in srgb, var(--ink) 14%, transparent);
+      stroke-width: 16;
+      stroke-linecap: round;
+    }
+
+    .gauge-fill {
+      fill: none;
+      stroke: url(#gaugeGradient);
+      stroke-width: 16;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.12s linear;
+    }
+
+    .gauge-tick { fill: var(--ink); font-size: 15px; font-weight: 800; text-anchor: middle; dominant-baseline: middle; }
+    .gauge-tick.dim { fill: var(--muted); }
+    .gauge-needle { fill: url(#needleGradient); transition: transform 0.12s linear; }
+    .gauge-hub { fill: var(--panel-solid); stroke: var(--line); }
+    /* 700, not 800. Above 700 the fallback stack resolves to a face without
+       tabular figures, and this is the number that counts up through the whole
+       test — the one element on the page where digits changing width is most
+       visible. Measured on the rendered stack: 400-700 keep tnum, 800+ lose it. */
+    .gauge-readout {
+      fill: var(--ink);
+      font-size: 42px;
+      font-weight: 700;
+      text-anchor: middle;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1;
+    }
+    .gauge-unit { fill: var(--muted); font-size: 15px; font-weight: 700; text-anchor: middle; }
+    .gauge-phase { fill: var(--teal); font-size: 13px; font-weight: 800; letter-spacing: 0.16em; text-anchor: middle; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .gauge-fill, .gauge-needle, .go-button { transition: none; }
+    }
+
+    .live-graph {
+      width: 100%;
+      max-width: 620px;
+      height: 110px;
+      border-radius: 8px;
+    }
+
+    .live-graph[hidden] { display: none; }
+
+    /* ---- Deep-measurement panels ------------------------------------- */
+    .insight-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .insight-grid[hidden] { display: none; }
+
+    .result-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .result-summary[hidden] { display: none; }
+
+    .insight {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      padding: 16px;
+    }
+
+    .result-summary .insight {
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--teal) 10%, transparent), transparent 62%),
+        var(--panel);
+    }
+
+    .insight-note {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 650;
+    }
+
+    .percentile-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .percentile-row strong {
+      display: block;
+      font-size: 1.35rem;
+      font-weight: 950;
+      line-height: 1.1;
+    }
+
+    .percentile-row span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .bloat-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .bloat-grade {
+      display: grid;
+      place-items: center;
+      width: 58px;
+      height: 58px;
+      flex: none;
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--green) 22%, transparent);
+      color: var(--green);
+      font-size: 1.5rem;
+      font-weight: 950;
+    }
+
+    .bloat-grade.warn { background: color-mix(in srgb, var(--amber) 22%, transparent); color: var(--amber); }
+    .bloat-grade.bad { background: color-mix(in srgb, var(--coral) 22%, transparent); color: var(--coral); }
+
+    .bloat-delta {
+      display: block;
+      font-size: 1.2rem;
+      font-weight: 900;
+    }
+
+    /* ---- Local history ------------------------------------------------ */
+    .history-panel {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      padding: 16px;
+    }
+
+    .history-panel[hidden] { display: none; }
+
+    .history-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .link-button {
+      border: 0;
+      background: none;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-decoration: underline;
+      padding: 0;
+      min-height: auto;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .history-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 1.1fr) repeat(3, minmax(0, 1fr)) minmax(0, 0.9fr);
+      gap: 10px;
+      align-items: baseline;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .history-row .when { color: var(--muted); font-size: 0.78rem; }
+    .history-row .delta.up { color: var(--green); }
+    .history-row .delta.down { color: var(--coral); }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      min-height: 150px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      /* `space-between` pushed the note to the floor of every card, so tiles
+         with a one-line note and tiles with a three-line note tore the grid's
+         baseline apart. Stacking from the top keeps the values on one line
+         across the row, which is what makes a grid read as a set. */
+      justify-content: flex-start;
+      gap: 4px;
+      backdrop-filter: blur(18px);
+      box-shadow: var(--elev-1), var(--edge-light);
+    }
+
+    /* The note is pinned to the bottom deliberately, so the VALUES align across
+       the row while the descriptions still settle on a common baseline. */
+    .metric > p {
+      margin-top: auto;
+      margin-bottom: 0;
+    }
+
+    .metric.featured {
+      grid-column: span 2;
+      min-height: 178px;
+      background: color-mix(in srgb, var(--teal) 18%, var(--panel));
+      border-color: color-mix(in srgb, var(--teal) 42%, var(--line));
+    }
+
+    /* Every element that shows a measured number gets fixed-width digits, so
+       nothing on the page changes width as a value updates. */
+    .gauge-readout,
+    .history-row,
+    .comparison-row,
+    .ranking-row,
+    .output-number,
+    #latMin, #latMedian, #latP95, #latMax,
+    #wifiScore, #gamingScore, #streamingScore, #videoScore, #workScore, #dnsScore,
+    #bandwidthResult, #pingGrade, #summaryHealth, #latencyProbes, #bloatDelta {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin: 12px 0 8px;
+      font-size: clamp(1.9rem, 3.8vw, 4.2rem);
+      /* Capped at 700 for the same reason as the dial readout: heavier faces in
+         this stack drop tabular figures, and a value that changes width while
+         it updates is the most obvious craft failure a speed test can have. */
+      font-weight: 700;
+      line-height: 1;
+      /* Tracking tightens as size grows. At 4.2rem, zero tracking reads loose
+         and the number stops looking like one object. */
+      letter-spacing: -0.03em;
+      /* Fixed-width digits. Without this every digit change resizes the number,
+         so a value counting up during a live test visibly jitters and nudges
+         its unit sideways — the most-watched element on the page, wobbling.
+         Inter ships tabular figures; this is the whole fix. */
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1, "cv01" 1;
+    }
+
+    .metric:not(.featured) .metric-value {
+      font-size: clamp(1.6rem, 2.6vw, 2.8rem);
+    }
+
+    .unit {
+      color: var(--muted);
+      font-size: 0.94rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    /* Empty state.
+       A metric with nothing behind it was rendering "--" at the full display
+       size in the full value colour, which reads as broken rather than as
+       waiting. The placeholder should be quiet: present enough to hold the
+       layout, quiet enough that nobody mistakes it for a reading. */
+    .metric-value[data-empty="true"] > span:first-child {
+      /* Sized relative to the value it stands in for, so it scales with the
+         tile but never reads as a number. At the value's own size an em dash is
+         a 60px bar — it looks like a loading indicator, not a placeholder. */
+      font-size: 0.42em;
+      font-weight: 500;
+      color: color-mix(in srgb, var(--muted) 50%, transparent);
+      letter-spacing: 0;
+      /* Nudged onto the optical centre of the line the digits would occupy. */
+      position: relative;
+      top: -0.18em;
+    }
+
+    .metric-value[data-empty="true"] .unit {
+      opacity: 0.7;
+    }
+
+    .metric p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .test-footer {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 18px;
+      backdrop-filter: blur(18px);
+    }
+
+    .progress-shell {
+      height: 10px;
+      margin-bottom: 14px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--muted) 22%, transparent);
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--teal), var(--amber), var(--coral));
+      transition: width 260ms ease;
+    }
+
+    .test-scope {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.55;
+      max-width: 68ch;
+    }
+
+    .test-note {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .test-edge {
+      margin: 8px 0 0;
+      color: var(--ink);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .test-edge[hidden] {
+      display: none;
+    }
+
+    .section {
+      padding: 88px 0;
+      background: var(--bg);
+    }
+
+    .section.alt {
+      background: var(--bg-soft);
+    }
+
+    .wrap {
+      width: min(1240px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .section-heading {
+      max-width: 840px;
+      margin-bottom: 34px;
+    }
+
+    .section-heading.center {
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
+    }
+
+    .section-flag {
+      display: inline-block;
+      margin-bottom: 10px;
+      border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line));
+      border-radius: 999px;
+      padding: 4px 12px;
+      color: var(--amber);
+      font-size: 0.72rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .section-heading h2 {
+      margin-bottom: 10px;
+      font-size: clamp(2rem, 4vw, 3.8rem);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .section-heading p,
+    .muted {
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 22px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .card.flat {
+      box-shadow: none;
+    }
+
+    .card h3 {
+      margin-bottom: 8px;
+      font-size: 1.08rem;
+    }
+
+    .card p {
+      color: var(--muted);
+      margin-bottom: 0;
+    }
+
+    .feature-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .icon-box {
+      width: 42px;
+      height: 42px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: color-mix(in srgb, var(--teal) 18%, transparent);
+      color: var(--teal);
+      font-weight: 950;
+    }
+
+    .icon-box.amber {
+      background: color-mix(in srgb, var(--amber) 18%, transparent);
+      color: var(--amber);
+    }
+
+    .icon-box.coral {
+      background: color-mix(in srgb, var(--coral) 18%, transparent);
+      color: var(--coral);
+    }
+
+    .icon-box.blue {
+      background: color-mix(in srgb, var(--blue) 18%, transparent);
+      color: var(--blue);
+    }
+
+    .intel-layout {
+      display: grid;
+      grid-template-columns: minmax(310px, 0.82fr) minmax(0, 1.18fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 0.88rem;
+      font-weight: 850;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--panel-solid) 82%, transparent);
+      color: var(--ink);
+      padding: 0 12px;
+      outline: none;
+    }
+
+    .field textarea {
+      min-height: 96px;
+      padding-top: 12px;
+      resize: vertical;
+    }
+
+    .field input[type="range"] {
+      padding: 0;
+      accent-color: var(--teal);
+      background: transparent;
+    }
+
+    .location-chain {
+      display: grid;
+      gap: 9px;
+      margin-top: 18px;
+    }
+
+    .chain-item {
+      display: grid;
+      grid-template-columns: 118px 1fr;
+      gap: 12px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: color-mix(in srgb, var(--panel) 74%, transparent);
+    }
+
+    .chain-item span:first-child {
+      color: var(--teal);
+      font-size: 0.8rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+
+    .profile-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .mini-metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--panel-solid) 62%, transparent);
+      padding: 16px;
+    }
+
+    .mini-metric strong {
+      display: block;
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+
+    .mini-metric span {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .world-map {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .region-tile {
+      min-height: 120px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--teal) 12%, transparent), transparent),
+        var(--panel);
+      padding: 15px;
+    }
+
+    .region-tile strong {
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .region-tile span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .comparison-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .table-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .comparison-row,
+    .ranking-row {
+      display: grid;
+      grid-template-columns: 1.1fr 0.65fr 0.55fr 0.55fr 0.55fr 0.75fr;
+      gap: 12px;
+      align-items: center;
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .comparison-row:last-child,
+    .ranking-row:last-child {
+      border-bottom: 0;
+    }
+
+    .comparison-row.header,
+    .ranking-row.header {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: color-mix(in srgb, var(--panel-solid) 50%, transparent);
+    }
+
+    .provider-name {
+      font-weight: 900;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .score-bar {
+      height: 9px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--muted) 20%, transparent);
+      overflow: hidden;
+    }
+
+    .score-bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--teal), var(--green));
+    }
+
+    .ranking-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .tab-button {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 14px;
+      background: var(--panel);
+      color: var(--muted);
+      font-weight: 850;
+    }
+
+    .tab-button.active {
+      background: var(--teal);
+      color: #031314;
+      border-color: transparent;
+    }
+
+    .tools-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tool-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+
+    .tool-kicker {
+      display: inline-block;
+      margin-bottom: 7px;
+      color: var(--teal);
+      font-size: 0.76rem;
+      font-weight: 950;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .output-number {
+      color: var(--ink);
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      font-weight: 950;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .output-number small {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .tool-result {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    .doctor-layout {
+      display: grid;
+      grid-template-columns: minmax(310px, 0.85fr) minmax(0, 1.15fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .upload-zone {
+      border: 2px dashed var(--strong-line);
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      background: var(--panel);
+    }
+
+    .upload-zone input {
+      margin-top: 14px;
+    }
+
+    .preview {
+      min-height: 210px;
+      margin-top: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .seo-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .location-card {
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .location-card a {
+      color: var(--teal);
+      font-weight: 900;
+    }
+
+    .content-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .article-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .article-link {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-top: 1px solid var(--line);
+      padding: 12px 0 0;
+      font-weight: 800;
+    }
+
+    .article-link span:last-child {
+      color: var(--teal);
+      white-space: nowrap;
+    }
+
+    .architecture-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .pipeline-step {
+      min-height: 112px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .pipeline-step strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--teal);
+    }
+
+    .community-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    /* The provider figures are illustrative, not measured. This has to sit next to
+       the numbers themselves — a footnote is not an honest disclosure when someone
+       is choosing an ISP based on what they read here. */
+    .data-notice {
+      display: block;
+      margin: 14px auto 0;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-left: 4px solid #f5a524;
+      border-radius: 8px;
+      background: rgba(245, 165, 36, 0.08);
+      font-size: 0.92rem;
+      line-height: 1.5;
+      max-width: 760px;
+      text-align: left;
+    }
+
+    .faq-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 18px 20px;
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    details p {
+      margin: 12px 0 0;
+      color: var(--muted);
+    }
+
+    .site-footer {
+      border-top: 1px solid var(--line);
+      background: #050b0f;
+      color: #d8e8ee;
+      padding: 42px 0;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      color: #a8b8c2;
+      font-weight: 750;
+    }
+
+    .result-card-canvas {
+      display: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .hero-inner,
+      .intel-layout,
+      .comparison-layout,
+      .doctor-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .feature-grid,
+      .seo-grid,
+      .community-grid,
+      .architecture-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .pipeline {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 840px) {
+      #menuButton {
+        display: inline-grid;
+      }
+
+      .nav-links {
+        position: fixed;
+        inset: 70px 0 auto 0;
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 8px 16px 18px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .nav-links.open {
+        display: flex;
+      }
+
+      .nav-links a {
+        padding: 14px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .nav-tools {
+        margin-left: auto;
+      }
+
+      .select-small {
+        max-width: 92px;
+      }
+
+      .hero-inner {
+        padding: 44px 0 64px;
+      }
+
+      .conn-strip,
+      .insight-grid,
+      .result-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .history-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .hero-stats,
+      .metric-grid,
+      .result-summary,
+      .world-map,
+      .profile-grid,
+      .tools-grid,
+      .content-grid,
+      .faq-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .metric.featured {
+        grid-column: auto;
+      }
+
+      .comparison-row,
+      .ranking-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+
+      .comparison-row.header,
+      .ranking-row.header {
+        display: none;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        padding: 66px 0;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .nav-wrap,
+      .wrap,
+      .hero-inner {
+        width: min(100% - 24px, 1240px);
+      }
+
+      .brand span:last-child {
+        font-size: 1.05rem;
+      }
+
+      h1 {
+        font-size: clamp(2.7rem, 15vw, 4.8rem);
+      }
+
+      .hero-actions .button,
+      .test-actions .button,
+      .share-actions .button {
+        width: 100%;
+      }
+
+      .tool-head {
+        display: block;
+      }
+
+      .output-number {
+        margin-top: 10px;
+      }
+
+      .pipeline {
+        grid-template-columns: 1fr;
+      }
+
+      .footer-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ============================================================
+       UI/UX Pro Max enhancement layer
+       Bento glassmorphism + micro-interactions + tech-green accent.
+       Applied on top of the base system; overrides only visual polish.
+       ============================================================ */
+    :root {
+      --accent-green: #22c55e;
+      --glow: 0 0 0 1px rgba(36, 209, 195, 0.14), 0 18px 50px rgba(0, 0, 0, 0.42);
+
+      /* One elevation strategy, layered rather than a single blur.
+         A card previously carried a border, an inset highlight, a backdrop blur
+         AND a gradient overlay on hover — four depth cues arguing with each
+         other. Real objects cast light that falls off in stages, which is what
+         several small shadows do and one large one cannot. Elevation here should
+         be felt, not seen. */
+      --elev-1:
+        0 0 0 0.5px rgba(0, 0, 0, 0.4),
+        0 1px 2px rgba(0, 0, 0, 0.24),
+        0 2px 6px rgba(0, 0, 0, 0.16);
+      --elev-2:
+        0 0 0 0.5px rgba(0, 0, 0, 0.45),
+        0 2px 4px rgba(0, 0, 0, 0.26),
+        0 6px 14px rgba(0, 0, 0, 0.2),
+        0 12px 28px rgba(0, 0, 0, 0.14);
+      /* The single hairline of light along a card's top edge that makes a dark
+         surface read as lit from above rather than as a flat hole. */
+      --edge-light: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    /* Ambient depth behind the whole page */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(60% 55% at 12% 0%, rgba(36, 209, 195, 0.14), transparent 60%),
+        radial-gradient(55% 50% at 92% 8%, rgba(87, 166, 255, 0.12), transparent 60%),
+        radial-gradient(70% 60% at 50% 110%, rgba(98, 210, 111, 0.10), transparent 60%);
+    }
+    html[data-theme="light"] body::before { opacity: 0.5; }
+
+    /* Metric cards: glass + tactile hover lift */
+    .metric {
+      position: relative;
+      transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+                  box-shadow 220ms ease, border-color 220ms ease;
+      will-change: transform;
+    }
+    .metric::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(140deg, rgba(255,255,255,0.22), transparent 40%);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+              mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 220ms ease;
+      pointer-events: none;
+    }
+    @media (hover: hover) {
+      .metric:hover {
+        transform: translateY(-6px);
+        border-color: color-mix(in srgb, var(--teal) 45%, var(--line));
+        box-shadow: var(--glow);
+      }
+      .metric:hover::after { opacity: 1; }
+    }
+
+    /* Primary CTA: animated gradient + stronger glow */
+    .button:not(.secondary):not(.dark) {
+      background: linear-gradient(120deg, var(--teal), var(--accent-green), var(--teal));
+      background-size: 200% 100%;
+      transition: transform 180ms ease, background-position 500ms ease, box-shadow 180ms ease;
+    }
+    @media (hover: hover) {
+      .button:not(.secondary):not(.dark):hover {
+        background-position: 100% 0;
+        transform: translateY(-2px);
+        box-shadow: 0 20px 46px rgba(36, 209, 195, 0.38);
+      }
+      .button.secondary:hover {
+        border-color: color-mix(in srgb, var(--teal) 55%, var(--strong-line));
+        transform: translateY(-2px);
+      }
+    }
+    .button:active { transform: translateY(0) scale(0.98); }
+
+    /* Live progress bar: animated sheen while the test runs */
+    .progress-bar {
+      background: linear-gradient(90deg, var(--teal), var(--accent-green), var(--blue));
+      background-size: 200% 100%;
+      box-shadow: 0 0 18px rgba(36, 209, 195, 0.5);
+      animation: progress-flow 2.2s linear infinite;
+    }
+    @keyframes progress-flow {
+      to { background-position: 200% 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .metric, .button { transition: none !important; }
+      .progress-bar { animation: none; }
+      body::before { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="top-ribbon">
+    Built by Pratham Gosai — also visit <a href="https://prathamgosai.in/" rel="me noopener">prathamgosai.in</a>
+  </div>
+  <header class="site-header">
+    <div class="nav-wrap">
+      <a class="brand" href="#top" aria-label="WifiPlus home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>WifiPlus</span>
+      </a>
+      <nav class="nav-links" id="navLinks" aria-label="Primary navigation">
+        <a href="#speed-test">Speed Test</a>
+        <a href="#ecosystem">Ecosystem</a>
+        <a href="#intelligence">ISP Intelligence</a>
+        <a href="#compare">Compare</a>
+        <a href="#doctor">AI Doctor</a>
+        <a href="#monetization">Monetization</a>
+      </nav>
+      <div class="nav-tools">
+        <select class="select-small" id="languageSelect" aria-label="Language">
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="ar">Arabic</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="pt">Portuguese</option>
+          <option value="zh">Chinese</option>
+          <option value="ja">Japanese</option>
+          <option value="ko">Korean</option>
+          <option value="ru">Russian</option>
+          <option value="tr">Turkish</option>
+          <option value="id">Indonesian</option>
+          <option value="bn">Bengali</option>
+          <option value="ur">Urdu</option>
+        </select>
+        <button class="icon-button" id="themeToggle" type="button" aria-label="Toggle dark mode">◐</button>
+        <button class="icon-button" id="menuButton" type="button" aria-label="Open menu" aria-controls="navLinks" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="speed-test">
+      <canvas class="hero-canvas" id="heroCanvas" aria-hidden="true"></canvas>
+      <div class="hero-inner">
+        <div>
+          <p class="eyebrow">Global AI internet intelligence</p>
+          <h1 data-i18n="heroTitle">WifiPlus — test your internet speed anywhere on Earth</h1>
+          <p class="hero-copy" data-i18n="heroCopy">WifiPlus measures speed, latency, DNS response, packet loss, and WiFi health, then compares results against providers in every major global region while powering SEO pages, outage maps, tool hubs, and enterprise APIs.</p>
+          <div class="hero-actions">
+            <a class="button" href="#speed-test" id="heroStart" data-i18n="startTest">Start Global Test</a>
+            <a class="button secondary" href="#intelligence">Explore ISP Database</a>
+            <button class="button secondary" id="installAppButton" type="button" hidden>Install App</button>
+          </div>
+          <div class="platform-pill" id="platformNotice">Cross-platform ready for desktop, mobile, macOS, Windows, Linux, and Unix-like systems.</div>
+          <div class="trust-strip" aria-label="Why the result is trustworthy">
+            <span>Real transferred bytes</span>
+            <span>p95 latency tail</span>
+            <span>Bufferbloat grade</span>
+            <span>Private local history</span>
+          </div>
+          <div class="hero-stats" aria-label="Global platform scale">
+            <div class="stat-pill"><strong>Live</strong><span>real speed measurement</span></div>
+            <div class="stat-pill"><strong>24</strong><span>countries in sample data</span></div>
+            <div class="stat-pill"><strong>15</strong><span>interface languages</span></div>
+            <div class="stat-pill"><strong>Free</strong><span>no signup required</span></div>
+          </div>
+        </div>
+
+        <div class="test-lab" aria-label="Internet speed test dashboard">
+          <!-- Who you are on the network, read from the edge that serves you.
+               Speedtest shows an ISP and a server; this shows the ASN, the
+               protocol actually negotiated, and the exact edge node. -->
+          <div class="conn-strip" id="connStrip" aria-live="polite">
+            <div class="conn-item">
+              <span class="conn-key">Provider</span>
+              <strong class="conn-val" id="connIsp">Detecting…</strong>
+              <span class="conn-sub" id="connAsn"></span>
+            </div>
+            <div class="conn-item">
+              <span class="conn-key">Your address</span>
+              <strong class="conn-val" id="connIp">—</strong>
+              <span class="conn-sub" id="connLocation"></span>
+            </div>
+            <div class="conn-item">
+              <span class="conn-key">Measurement edge</span>
+              <strong class="conn-val" id="connEdge">—</strong>
+              <span class="conn-sub" id="connProtocol"></span>
+            </div>
+            <div class="conn-item">
+              <span class="conn-key">Client</span>
+              <strong class="conn-val" id="connClient">—</strong>
+              <span class="conn-sub">No app, no ads, no signup</span>
+            </div>
+          </div>
+
+          <div class="gauge-stage">
+            <button class="go-button" id="goButton" type="button" aria-label="Start WiFi speed test">GO</button>
+            <p class="go-caption" id="goCaption">Press GO to test your WiFi — about 11 seconds, no signup.</p>
+
+            <div class="gauge" id="gauge" hidden aria-hidden="true">
+              <svg viewBox="0 0 340 356" role="img" aria-label="Live speed gauge">
+                <defs>
+                  <linearGradient id="gaugeGradient" x1="0" y1="1" x2="1" y2="0">
+                    <stop offset="0%" stop-color="var(--blue)" />
+                    <stop offset="55%" stop-color="var(--teal)" />
+                    <stop offset="100%" stop-color="var(--violet)" />
+                  </linearGradient>
+                  <linearGradient id="needleGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--ink)" />
+                    <stop offset="100%" stop-color="var(--muted)" />
+                  </linearGradient>
+                </defs>
+                <circle class="gauge-track" cx="170" cy="170" r="130"
+                        transform="rotate(135 170 170)" stroke-dasharray="612.6 816.8" />
+                <circle class="gauge-fill" id="gaugeFill" cx="170" cy="170" r="130"
+                        transform="rotate(135 170 170)" stroke-dasharray="612.6 816.8"
+                        stroke-dashoffset="612.6" />
+                <g id="gaugeTicks"></g>
+                <polygon class="gauge-needle" id="gaugeNeedle" points="166,170 174,170 171,66 169,66"
+                         transform="rotate(0 170 170)" />
+                <circle class="gauge-hub" cx="170" cy="170" r="7" stroke-width="1" />
+                <text class="gauge-phase" id="gaugePhase" x="170" y="272">DOWNLOAD</text>
+                <text class="gauge-readout" id="gaugeReadout" x="170" y="318">0.00</text>
+                <text class="gauge-unit" id="gaugeUnit" x="170" y="344">Mbps</text>
+              </svg>
+            </div>
+
+            <!-- Real throughput samples plotted as they arrive, download and
+                 upload on one timeline. -->
+            <canvas class="live-graph" id="liveGraph" width="960" height="220" hidden
+                    aria-label="Live throughput over the run"></canvas>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric featured">
+              <span class="metric-label">Download</span>
+              <div class="metric-value" data-empty="true"><span id="downloadValue">—</span><span class="unit">Mbps</span></div>
+              <p>Measures how fast data is received from the nearest edge node.</p>
+            </article>
+            <article class="metric">
+              <span class="metric-label">Upload</span>
+              <div class="metric-value" data-empty="true"><span id="uploadValue">—</span><span class="unit">Mbps</span></div>
+              <p>Measures how fast data is sent to the network.</p>
+            </article>
+            <article class="metric">
+              <span class="metric-label">Ping</span>
+              <div class="metric-value" data-empty="true"><span id="pingValue">—</span><span class="unit">ms</span></div>
+              <p>Lower latency is better for gaming and calls.</p>
+            </article>
+            <article class="metric">
+              <span class="metric-label">Jitter</span>
+              <div class="metric-value" data-empty="true"><span id="jitterValue">—</span><span class="unit">ms</span></div>
+              <p>Measures latency consistency over time.</p>
+            </article>
+            <article class="metric">
+              <span class="metric-label">Packet loss</span>
+              <div class="metric-value" data-empty="true"><span id="lossValue">—</span><span class="unit">%</span></div>
+              <p>Share of latency probes that never came back. A browser cannot observe true packet loss — TCP hides it by resending — so this is the closest proxy available.</p>
+            </article>
+            <article class="metric">
+              <span class="metric-label">DNS latency</span>
+              <div class="metric-value" data-empty="true"><span id="dnsValue">—</span><span class="unit">ms</span></div>
+              <p>Time for an uncached lookup through Cloudflare's DNS-over-HTTPS resolver — not the resolver your system is set to use, which a browser cannot query.</p>
+            </article>
+            <article class="metric">
+              <span class="metric-label">Stability</span>
+              <div class="metric-value" data-empty="true"><span id="stabilityValue">—</span><span class="unit">%</span></div>
+              <p>Combines jitter, packet loss, and variance.</p>
+            </article>
+          </div>
+
+          <!-- The measurements consumer speed tests leave out. -->
+          <div class="insight-grid" id="insightGrid" hidden>
+            <article class="insight">
+              <span class="metric-label">Latency distribution</span>
+              <p class="insight-note" id="latencyProbes">—</p>
+              <div class="percentile-row">
+                <div><strong id="latMin">—</strong><span>Min</span></div>
+                <div><strong id="latMedian">—</strong><span>Median</span></div>
+                <div><strong id="latP95">—</strong><span>p95</span></div>
+                <div><strong id="latMax">—</strong><span>Max</span></div>
+              </div>
+              <p class="insight-note">The p95 tail is what you actually feel on a call — an average hides it.</p>
+            </article>
+
+            <article class="insight">
+              <span class="metric-label">Latency under load · bufferbloat</span>
+              <div class="bloat-row">
+                <span class="bloat-grade" id="bloatGrade">–</span>
+                <div>
+                  <strong class="bloat-delta" id="bloatDelta">—</strong>
+                  <p class="insight-note" id="bloatDetail">Measured during the download, while your link is saturated.</p>
+                </div>
+              </div>
+              <p class="insight-note" id="bloatVerdict">Graded A to F. This is the number that explains calls breaking up while someone streams.</p>
+            </article>
+          </div>
+
+          <section class="history-panel" id="historyPanel" hidden aria-label="Your recent tests">
+            <div class="history-head">
+              <span class="metric-label">Your history · stored on this device only</span>
+              <button class="link-button" id="clearHistory" type="button">Clear</button>
+            </div>
+            <div class="history-list" id="historyList"></div>
+          </section>
+
+          <div class="test-footer">
+            <div class="progress-shell" aria-hidden="true">
+              <div class="progress-bar" id="testProgress"></div>
+            </div>
+            <div class="test-actions">
+              <button class="button secondary danger" id="stopTest" type="button" hidden>Stop Test</button>
+              <button class="button secondary" id="downloadCard" type="button">Download Result Card</button>
+              <button class="button secondary" id="shareResult" type="button">Share Result</button>
+              <button class="button secondary" id="copyResultLink" type="button">Copy Result Link</button>
+            </div>
+            <p class="test-note" id="testStatus">Ready. About 11 seconds for download, upload, adaptive latency probing with p95, packet loss, DNS and a bufferbloat grade — real bytes over a global edge network, no ads, no signup, no simulated values.</p>
+            <!-- Named because the result means nothing without it: the same link
+                 measures differently against an edge 5ms away and one 200ms away. -->
+            <p class="test-edge" id="selectedEdge" hidden></p>
+            <!-- Scope, stated where the test is run rather than buried in an FAQ.
+                 Every consumer speed test has this limitation; most do not say so. -->
+            <p class="test-scope">What this measures: the whole path from this browser, over your WiFi or cable, through your router and your ISP, to the nearest measurement edge — end to end. No web page can isolate the WiFi hop on its own. To find out whether WiFi is your bottleneck, run this once over WiFi and once on an Ethernet cable to the same router and compare.</p>
+          </div>
+
+          <div class="result-summary" id="resultSummary" hidden aria-label="Result diagnosis">
+            <article class="insight">
+              <span class="metric-label" id="summaryHealth">Health --/100</span>
+              <p class="insight-note" id="summaryHealthText">Run a test to generate a connection verdict.</p>
+            </article>
+            <article class="insight">
+              <span class="metric-label" id="summaryLoss">Packet loss</span>
+              <p class="insight-note" id="summaryLossText">Packet loss diagnosis appears after the test.</p>
+            </article>
+            <article class="insight">
+              <span class="metric-label" id="summaryBalance">Upload balance</span>
+              <p class="insight-note" id="summaryBalanceText">Upload and download balance appears after the test.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Built for global ISP discovery, testing, and recommendation</h2>
+          <p>WifiPlus is structured for fiber, cable, broadband, wireless, fixed wireless, mobile, satellite, government-owned, private, regional, and enterprise internet providers.</p>
+        </div>
+        <div class="grid feature-grid">
+          <article class="card flat">
+            <div class="icon-box">AI</div>
+            <h3>AI Internet Analyzer</h3>
+            <p>Explains connection quality, detects bottlenecks, and recommends improvements for real user results.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box blue">DB</div>
+            <h3>Worldwide ISP Database</h3>
+            <p>Designed around Country, State, City, ISP, Plan, Reviews, and Speed Test Results.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box amber">RX</div>
+            <h3>ISP Recommendation Engine</h3>
+            <p>Matches country, city, budget, gaming, streaming, and work needs to available providers.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box coral">SEO</div>
+            <h3>Location SEO Engine</h3>
+            <p>Generates pages like Best ISP in New York, London, Dubai, Sydney, Mumbai, Surat, Tokyo, and Singapore.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="ecosystem">
+      <div class="wrap">
+        <div class="section-heading">
+          <span class="section-flag">Roadmap — not built yet</span>
+          <h2>One platform for testing, diagnosis, content, and growth</h2>
+          <p>Where WifiPlus is heading. The speed test above is live and real; everything in this section is planned and not yet implemented, so nothing here is something you can use today.</p>
+        </div>
+        <div class="grid feature-grid">
+          <article class="card flat">
+            <div class="icon-box">⚡</div>
+            <h3>Real speed testing</h3>
+            <p>Measures download, upload, ping, jitter, packet loss, DNS response, IPv4/IPv6 behavior, and stability with live network evidence.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box blue">🤖</div>
+            <h3>AI internet doctor</h3>
+            <p>Explains bottlenecks, recommends router changes, suggests DNS upgrades, and helps users choose smarter ISP plans.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box amber">🌐</div>
+            <h3>Global ISP database</h3>
+            <p>Supports provider profiles, regional availability, pricing, reviews, scorecards, and comparison-ready data structures.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box coral">📡</div>
+            <h3>Outage intelligence</h3>
+            <p>Supports regional outage pages, live incident maps, provider status timelines, and user-reported issue signals.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box">🧠</div>
+            <h3>Tool Hub</h3>
+            <p>Builds a large library of free networking tools that attract traffic, build authority, and support affiliate revenue.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box blue">📰</div>
+            <h3>News and content</h3>
+            <p>Publishes telecom news, ISP updates, outage reports, and evergreen troubleshooting guides to sustain organic traffic.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box amber">👥</div>
+            <h3>Community and reviews</h3>
+            <p>Supports local discussions, ISP reviews, router feedback, and user-generated insights that improve trust and retention.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box coral">🏢</div>
+            <h3>Enterprise API</h3>
+            <p>Provides analytics, partner dashboards, and API access for ISPs, MSPs, telecom vendors, and enterprise buyers.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="monetization">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Designed for growth, trust, and multi-revenue monetization</h2>
+          <p>WifiPlus can monetize through affiliate partnerships, sponsored listings, premium memberships, enterprise dashboards, API access, and local lead generation while keeping the core experience valuable for users.</p>
+        </div>
+        <div class="grid feature-grid">
+          <article class="card flat">
+            <div class="icon-box">💸</div>
+            <h3>Affiliate and lead generation</h3>
+            <p>High-intent traffic from speed tests and comparison pages makes ISP and router recommendations highly monetizable.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box blue">🧾</div>
+            <h3>Premium subscriptions</h3>
+            <p>Offer advanced diagnostics, historical reports, alerts, and richer insights for power users and professionals.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box amber">📊</div>
+            <h3>Enterprise analytics</h3>
+            <p>Provide dashboards, APIs, and white-label services for telecom brands, local ISPs, and B2B buyers.</p>
+          </article>
+          <article class="card flat">
+            <div class="icon-box coral">🚀</div>
+            <h3>Growth and retention</h3>
+            <p>Shareable results, ranking pages, and community engagement create compounding returns through repeat visits and virality.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="intelligence">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Global ISP Intelligence System</h2>
+          <p>Browse an extensible seed dataset and see how the production system organizes ISP intelligence for every region worldwide.</p>
+          <p class="data-notice"><strong>Sample data:</strong> the provider figures below — speeds, pricing, uptime and ratings — are illustrative examples for this prototype, covering 38 providers in 24 countries. They are not measured results and should not be used to choose an ISP. Your own speed test above measures your real connection.</p>
+        </div>
+        <div class="intel-layout">
+          <aside class="card">
+            <span class="tool-kicker">Location hierarchy</span>
+            <h3>Country to plan intelligence</h3>
+            <div class="form-grid">
+              <div class="field">
+                <label for="countrySelect">Country</label>
+                <select id="countrySelect"></select>
+              </div>
+              <div class="field">
+                <label for="citySelect">City</label>
+                <select id="citySelect"></select>
+              </div>
+              <div class="field full">
+                <label for="providerSelect">ISP profile</label>
+                <select id="providerSelect"></select>
+              </div>
+            </div>
+            <div class="location-chain">
+              <div class="chain-item"><span>Country</span><strong id="chainCountry">India</strong></div>
+              <div class="chain-item"><span>State</span><strong id="chainState">Maharashtra</strong></div>
+              <div class="chain-item"><span>City</span><strong id="chainCity">Mumbai</strong></div>
+              <div class="chain-item"><span>ISP</span><strong id="chainProvider">Jio Fiber</strong></div>
+              <div class="chain-item"><span>Plan</span><strong id="chainPlan">Fiber 1 Gbps</strong></div>
+            </div>
+          </aside>
+
+          <div>
+            <article class="card">
+              <div class="tool-head">
+                <div>
+                  <span class="tool-kicker">ISP profile</span>
+                  <h3 id="profileName">Jio Fiber</h3>
+                  <p id="profileSummary">Private fiber broadband provider serving Mumbai, India.</p>
+                </div>
+                <div class="output-number"><span id="profileScore">—</span><small>/100</small></div>
+              </div>
+              <div class="grid profile-grid">
+                <div class="mini-metric"><strong id="profileDownload">—</strong><span>Avg download Mbps</span></div>
+                <div class="mini-metric"><strong id="profileUpload">—</strong><span>Avg upload Mbps</span></div>
+                <div class="mini-metric"><strong id="profilePing">—</strong><span>Median ping ms</span></div>
+                <div class="mini-metric"><strong id="profileCoverage">—</strong><span>Coverage estimate</span></div>
+                <div class="mini-metric"><strong id="profileReliability">—</strong><span>Reliability score</span></div>
+                <div class="mini-metric"><strong id="profileRating">—</strong><span>User rating</span></div>
+              </div>
+              <div class="tag-list" id="profileTags"></div>
+            </article>
+
+            <div class="world-map" id="regionMap" aria-label="Worldwide region coverage"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="compare">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Global ISP Comparison Center</h2>
+          <p>Compare providers by download, upload, ping, jitter, packet loss, reliability, customer satisfaction, pricing, coverage, and data caps.</p>
+          <p class="data-notice"><strong>Sample data:</strong> these comparisons use the illustrative prototype dataset, not measured provider performance.</p>
+        </div>
+        <div class="comparison-layout">
+          <div>
+            <div class="filter-row" style="margin-bottom: 14px;">
+              <select class="select-small" id="sortSelect" aria-label="Sort comparison">
+                <option value="download">Download</option>
+                <option value="upload">Upload</option>
+                <option value="ping">Ping</option>
+                <option value="reliability">Reliability</option>
+                <option value="value">Value</option>
+              </select>
+              <button class="button secondary" id="globalScopeButton" type="button">Show Worldwide</button>
+            </div>
+            <div class="table-card" id="comparisonTable" aria-label="ISP comparison table"></div>
+          </div>
+          <aside class="card">
+            <span class="tool-kicker">Availability signals</span>
+            <h3 id="availabilityTitle">Mumbai coverage mix</h3>
+            <p id="availabilityText">Fiber and mobile broadband are strongest in this market. Satellite fallback is available through global providers.</p>
+            <div class="tag-list" id="availabilityTags"></div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="rankings">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Worldwide ranking systems</h2>
+          <p>Rank global providers across speed, reliability, gaming, streaming, remote work, and value.</p>
+          <p class="data-notice"><strong>Sample data:</strong> these rankings are computed from the illustrative prototype dataset and do not reflect real provider performance.</p>
+        </div>
+        <div class="ranking-tabs" role="tablist" aria-label="Ranking categories">
+          <button class="tab-button active" type="button" data-rank="world">Fastest ISP in the World</button>
+          <button class="tab-button" type="button" data-rank="gaming">Best ISP for Gaming</button>
+          <button class="tab-button" type="button" data-rank="streaming">Best ISP for Streaming</button>
+          <button class="tab-button" type="button" data-rank="remote">Best ISP for Remote Work</button>
+          <button class="tab-button" type="button" data-rank="value">Best Value ISP</button>
+        </div>
+        <div class="table-card" id="rankingTable" aria-label="Worldwide rankings"></div>
+      </div>
+    </section>
+
+    <section class="section" id="recommend">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>AI ISP Recommendation Engine</h2>
+          <p>Users enter location, budget, and usage needs. WifiPlus recommends providers available in their area.</p>
+          <p class="data-notice"><strong>Sample data:</strong> recommendations are generated from the illustrative prototype dataset. Treat them as a demonstration of the matching logic, not as buying advice.</p>
+        </div>
+        <div class="intel-layout">
+          <article class="card">
+            <div class="form-grid">
+              <div class="field">
+                <label for="recCountry">Country</label>
+                <select id="recCountry"></select>
+              </div>
+              <div class="field">
+                <label for="recCity">City</label>
+                <select id="recCity"></select>
+              </div>
+              <div class="field">
+                <label for="recBudget">Monthly budget in USD</label>
+                <input id="recBudget" type="number" min="5" value="60">
+              </div>
+              <div class="field">
+                <label for="recUsage">Primary usage</label>
+                <select id="recUsage">
+                  <option value="balanced">Balanced home internet</option>
+                  <option value="gaming">Gaming</option>
+                  <option value="streaming">Streaming</option>
+                  <option value="remote">Remote work</option>
+                  <option value="enterprise">Enterprise connectivity</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="gamingNeed">Gaming priority <span id="gamingNeedLabel">7</span></label>
+                <input id="gamingNeed" type="range" min="0" max="10" value="7">
+              </div>
+              <div class="field">
+                <label for="streamingNeed">Streaming priority <span id="streamingNeedLabel">8</span></label>
+                <input id="streamingNeed" type="range" min="0" max="10" value="8">
+              </div>
+            </div>
+            <div class="hero-actions">
+              <button class="button" id="recommendButton" type="button">Recommend Providers</button>
+            </div>
+          </article>
+          <div class="grid" id="recommendations"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="tools">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Calculators and diagnostics</h2>
+          <p>Practical tools that support SEO traffic and help users understand their connection before choosing a provider.</p>
+        </div>
+        <div class="grid tools-grid">
+          <article class="card">
+            <div class="tool-head">
+              <div>
+                <span class="tool-kicker">Bandwidth Calculator</span>
+                <h3>Estimate required speed</h3>
+              </div>
+              <div class="output-number"><span id="bandwidthResult">—</span><small> Mbps</small></div>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label for="devices">Devices <span id="devicesLabel">8</span></label><input id="devices" type="range" min="1" max="50" value="8"></div>
+              <div class="field"><label for="streams">4K streams <span id="streamsLabel">2</span></label><input id="streams" type="range" min="0" max="10" value="2"></div>
+              <div class="field"><label for="gamers">Gamers <span id="gamersLabel">2</span></label><input id="gamers" type="range" min="0" max="10" value="2"></div>
+              <div class="field"><label for="workers">Video calls <span id="workersLabel">2</span></label><input id="workers" type="range" min="0" max="12" value="2"></div>
+            </div>
+            <p class="tool-result" id="bandwidthAdvice">Move the sliders to size a plan for your household.</p>
+          </article>
+
+          <article class="card">
+            <div class="tool-head">
+              <div>
+                <span class="tool-kicker">Gaming Latency</span>
+                <h3>Find ideal ping targets</h3>
+              </div>
+              <div class="output-number"><span id="pingGrade">A</span></div>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label for="gameSelect">Game profile</label><select id="gameSelect"><option value="35">BGMI</option><option value="30">Valorant</option><option value="45">Free Fire</option><option value="60">Casual multiplayer</option></select></div>
+              <div class="field"><label for="pingInput">Your ping in ms</label><input id="pingInput" type="number" min="1" max="300" value="28"></div>
+            </div>
+            <p class="tool-result" id="pingAdvice">Excellent for competitive matches. Keep jitter under 10 ms.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="doctor">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>AI Internet Analyzer and AI WiFi Doctor</h2>
+          <p>Analyze speed results, router screenshots, security settings, channel selection, placement, coverage, and performance opportunities.</p>
+        </div>
+        <div class="doctor-layout">
+          <div>
+            <article class="card">
+              <span class="tool-kicker">Current analysis</span>
+              <h3 id="analysisTitle">Run a speed test to generate AI insights</h3>
+              <p id="analysisText">WifiPlus will score gaming, streaming, video calls, work from home, network stability, DNS latency, and WiFi health.</p>
+              <div class="grid profile-grid" style="margin-top: 18px;">
+                <div class="mini-metric"><strong id="wifiScore">—</strong><span>WiFi health</span></div>
+                <div class="mini-metric"><strong id="gamingScore">—</strong><span>Gaming score</span></div>
+                <div class="mini-metric"><strong id="streamingScore">—</strong><span>Streaming score</span></div>
+                <div class="mini-metric"><strong id="videoScore">—</strong><span>Video call score</span></div>
+                <div class="mini-metric"><strong id="workScore">—</strong><span>Work score</span></div>
+                <div class="mini-metric"><strong id="dnsScore">—</strong><span>DNS score</span></div>
+              </div>
+            </article>
+          </div>
+
+          <div>
+            <div class="upload-zone">
+              <h3>Upload router settings screenshot</h3>
+              <p>Previewed locally in this prototype. Production AI would detect weak security, congested channels, and outdated settings.</p>
+              <input id="routerUpload" type="file" accept="image/png,image/jpeg,image/webp">
+            </div>
+            <div class="preview" id="uploadPreview">No screenshot uploaded</div>
+            <div class="grid tools-grid" style="margin-top: 16px;">
+              <article class="card flat"><h3>Security</h3><p id="doctorSecurity">Enable WPA3 if available. Disable WPS and use a strong unique password.</p></article>
+              <article class="card flat"><h3>Channels</h3><p id="doctorChannel">Use channels 1, 6, or 11 on 2.4 GHz. Prefer 5 GHz or 6 GHz near the router.</p></article>
+              <article class="card flat"><h3>Placement</h3><p id="doctorPlacement">Keep the router central, elevated, and away from thick walls or metal cabinets.</p></article>
+              <article class="card flat"><h3>Performance</h3><p id="doctorPerformance">Separate smart home devices from high-speed devices and keep firmware updated.</p></article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Each of these is a real page targeting one search intent. They are linked
+         from here because an unlinked page is one a crawler has to be told about
+         and a reader can never find. -->
+    <section class="section" id="tests">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Test one thing at a time</h2>
+          <p>The full test above measures everything in one pass. These pages each explain and measure a single metric, in depth.</p>
+        </div>
+        <div class="grid feature-grid">
+          <a class="card flat" href="/internet-speed-test/">
+            <h3>Internet speed test</h3>
+            <p>Complete download, upload, ping, jitter, DNS, packet loss and bufferbloat measurement.</p>
+          </a>
+          <a class="card flat" href="/wifi-analyzer/">
+            <h3>WiFi analyzer</h3>
+            <p>Diagnose weak wireless, router queueing, coverage problems and call-breaking jitter.</p>
+          </a>
+          <a class="card flat" href="/wifi-speed-test/">
+            <h3>WiFi speed test</h3>
+            <p>What your wireless link actually delivers, and how to tell the WiFi apart from the line.</p>
+          </a>
+          <a class="card flat" href="/ping-test/">
+            <h3>Ping test</h3>
+            <p>Median latency, the p95 tail and packet loss across 20 probes.</p>
+          </a>
+          <a class="card flat" href="/jitter-test/">
+            <h3>Jitter test</h3>
+            <p>Why calls sound robotic on a connection whose speed test looks perfect.</p>
+          </a>
+          <a class="card flat" href="/packet-loss-test/">
+            <h3>Packet loss test</h3>
+            <p>Even 1% loss stalls video and drops calls while speed stays high.</p>
+          </a>
+          <a class="card flat" href="/bufferbloat-test/">
+            <h3>Bufferbloat test</h3>
+            <p>Latency under load, graded A to F — why calls break when someone downloads.</p>
+          </a>
+          <a class="card flat" href="/dns-speed-test/">
+            <h3>DNS speed test</h3>
+            <p>Time for an uncached lookup through Cloudflare's DNS-over-HTTPS resolver — not the resolver your system is set to use, which a browser cannot query.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="seo">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Worldwide location-aware SEO pages</h2>
+          <p>Generate search-ready pages for every supported country, state, province, city, ISP, technology type, and use case.</p>
+        </div>
+        <div class="grid seo-grid" id="seoPages"></div>
+      </div>
+    </section>
+
+    <section class="section" id="content">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Content and SEO ecosystem</h2>
+          <p>Editorial hubs create durable organic traffic around ISP reviews, broadband guides, troubleshooting, routers, gaming, streaming, fiber, and telecom news.</p>
+        </div>
+        <div class="grid content-grid">
+          <article class="card">
+            <span class="tool-kicker">ISP reviews</span>
+            <div class="article-list">
+              <a class="article-link" href="#compare"><span>Jio Fiber Review</span><span>Compare</span></a>
+              <a class="article-link" href="#compare"><span>Xfinity vs Verizon Fios</span><span>Compare</span></a>
+              <a class="article-link" href="#availability"><span>Starlink Availability Guide</span><span>Check</span></a>
+              <a class="article-link" href="#rankings"><span>BT vs Virgin Media</span><span>Rank</span></a>
+            </div>
+          </article>
+          <article class="card">
+            <span class="tool-kicker">Troubleshooting</span>
+            <div class="article-list">
+              <a class="article-link" href="/internet-speed-test/"><span>Why Is My Internet Slow?</span><span>Read</span></a>
+              <a class="article-link" href="/jitter-test/"><span>What Is Jitter?</span><span>Read</span></a>
+              <a class="article-link" href="/packet-loss-test/"><span>Fix YouTube Buffering</span><span>Read</span></a>
+              <a class="article-link" href="/wifi-analyzer/"><span>Router Placement Guide</span><span>Read</span></a>
+            </div>
+          </article>
+          <article class="card">
+            <span class="tool-kicker">Use cases</span>
+            <div class="article-list">
+              <a class="article-link" href="/ping-test/"><span>Best Ping for Valorant</span><span>Read</span></a>
+              <a class="article-link" href="/wifi-speed-test/"><span>Netflix 4K Speed Needed</span><span>Read</span></a>
+              <a class="article-link" href="/wifi-analyzer/"><span>WiFi 6 vs WiFi 7</span><span>Read</span></a>
+              <a class="article-link" href="/internet-speed-test/"><span>Fiber vs Cable Internet</span><span>Read</span></a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="architecture">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Enterprise-grade architecture</h2>
+          <p>The static prototype documents the production target: Next.js, React, TypeScript, Tailwind CSS, Framer Motion, Three.js, Node.js, PostgreSQL, Redis, Cloudflare CDN, global edge network, AWS or Google Cloud, and Vercel deployment.</p>
+        </div>
+        <div class="grid architecture-grid">
+          <article class="card"><h3>Frontend</h3><p>Next.js app router, React components, TypeScript contracts, Tailwind design tokens, Framer Motion states, and Three.js network visualization.</p></article>
+          <article class="card"><h3>Backend</h3><p>Node.js APIs, PostgreSQL for canonical ISP data, Redis for rankings and live test session state, and queue workers for ingestion.</p></article>
+          <article class="card"><h3>Infrastructure</h3><p>Cloudflare CDN, global edge measurement nodes, Vercel frontend, AWS or Google Cloud APIs, object storage, and observability.</p></article>
+        </div>
+        <div class="pipeline" aria-label="Automatic ISP data update pipeline">
+          <div class="pipeline-step"><strong>1. Ingest</strong><span>Regulators, provider APIs, public datasets, user submissions, and verified partners.</span></div>
+          <div class="pipeline-step"><strong>2. Normalize</strong><span>Map country, province, city, technology, plans, currencies, and coverage.</span></div>
+          <div class="pipeline-step"><strong>3. Verify</strong><span>Deduplicate, score confidence, flag suspicious changes, and review edge cases.</span></div>
+          <div class="pipeline-step"><strong>4. Rank</strong><span>Aggregate speed tests, reviews, reliability, uptime, latency, and value.</span></div>
+          <div class="pipeline-step"><strong>5. Publish</strong><span>Update APIs, search indexes, sitemap pages, comparison tables, and recommendations.</span></div>
+          <div class="pipeline-step"><strong>6. Learn</strong><span>Use feedback, reviews, and test results to improve availability and quality predictions.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="community">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Community, reviews, and trust</h2>
+          <p>Accounts, speed history, ISP reviews, ratings, comments, discussion forums, shareable cards, and community rankings create repeat usage.</p>
+        </div>
+        <div class="grid community-grid">
+          <article class="card flat"><h3>User accounts</h3><p>Save speed history, devices, locations, plans, favorites, and alerts.</p></article>
+          <article class="card flat"><h3>ISP reviews</h3><p>Collect ratings for speed, support, value, uptime, and installation quality.</p></article>
+          <article class="card flat"><h3>Discussion forums</h3><p>Organize local ISP issues, router problems, outages, and optimization tips.</p></article>
+          <article class="card flat"><h3>Trust signals</h3><p>SSL, privacy policy, terms, contact, about, moderation, and transparent data methodology.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="faq">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2>Implementation notes</h2>
+          <p>This prototype is static and mobile-first. The speed test performs real measurements against a public global edge network; the ISP dataset and rankings are still representative seed data.</p>
+        </div>
+        <div class="grid faq-grid">
+          <details open><summary>Can this support 200+ countries?</summary><p>Yes by design. The data model stores country, state, city, ISP, plan, review, speed result, coverage, and ranking entities. The included dataset is representative seed data for the prototype.</p></details>
+          <details><summary>How does automatic ISP expansion work?</summary><p>A production ingestion pipeline pulls regulator files, provider feeds, public datasets, partner APIs, and user submissions into normalized PostgreSQL tables with verification workflows.</p></details>
+          <details><summary>How are real speed tests measured?</summary><p>Download and upload throughput are measured by moving real bytes over parallel HTTP streams against the nearest Cloudflare edge, discarding the first half-second while the congestion window ramps. Ping, jitter, and packet loss come from repeated timed probes; DNS latency comes from uncached DNS-over-HTTPS lookups.</p></details>
+          <details><summary>Does PWA support work from a file?</summary><p>The page opens directly as HTML. Service worker offline caching works when hosted over HTTPS or localhost.</p></details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true"></span><span>WifiPlus</span></a>
+        <p>Global AI speed testing, ISP intelligence, rankings, recommendations, SEO pages, and community platform.</p>
+        <p style="margin-top:10px;font-size:0.88rem;">
+          WifiPlus is built by <a href="https://prathamgosai.in/" rel="me noopener" style="color:var(--teal);font-weight:900;text-decoration:underline;text-underline-offset:2px;">Pratham Gosai — visit prathamgosai.in</a>
+        </p>
+      </div>
+      <div class="footer-links">
+        <a href="#speed-test">Speed Test</a>
+        <a href="#intelligence">Database</a>
+        <a href="#compare">Compare</a>
+        <a href="#rankings">Rankings</a>
+        <a href="#architecture">Architecture</a>
+        <a href="https://prathamgosai.in/" rel="me noopener">prathamgosai.in</a>
+      </div>
+    </div>
+  </footer>
+
+  <canvas class="result-card-canvas" id="resultCardCanvas" width="1080" height="1080"></canvas>
+
+  <!-- Classic script, so it still runs in the one case it exists to report: a
+       page opened from file://, where ES modules are blocked outright. Kept out
+       of the HTML because CSP forbids inline script. -->
+  <script src="boot-check.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

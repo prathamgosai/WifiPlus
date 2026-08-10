@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Packet Loss Test — Find Dropped Packets | WifiPlus</title>
+<meta name="description" content="Free packet loss test. Even 1-2% loss causes stalling video, dropped calls and rubber-banding in games while your speed test still looks normal.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="Pratham Gosai">
+<link rel="canonical" href="https://wifiplus.prathamgosai.in/packet-loss-test/">
+<link rel="alternate" hreflang="en" href="https://wifiplus.prathamgosai.in/packet-loss-test/">
+<link rel="alternate" hreflang="x-default" href="https://wifiplus.prathamgosai.in/packet-loss-test/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="WifiPlus">
+<meta property="og:locale" content="en">
+<meta property="og:url" content="https://wifiplus.prathamgosai.in/packet-loss-test/">
+<meta property="og:title" content="Packet Loss Test — Find Dropped Packets | WifiPlus">
+<meta property="og:description" content="Free packet loss test. Even 1-2% loss causes stalling video, dropped calls and rubber-banding in games while your speed test still looks normal.">
+<meta property="og:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Packet Loss Test — Find Dropped Packets | WifiPlus">
+<meta name="twitter:description" content="Free packet loss test. Even 1-2% loss causes stalling video, dropped calls and rubber-banding in games while your speed test still looks normal.">
+<meta name="twitter:image" content="https://wifiplus.prathamgosai.in/og-image.png">
+<meta name="theme-color" content="#071116">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/landing.css">
+<link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://cloudflare-dns.com">
+<link rel="modulepreload" href="/landing.js">
+<link rel="modulepreload" href="/core/measure.js">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://wifiplus.prathamgosai.in/packet-loss-test/#webpage","url":"https://wifiplus.prathamgosai.in/packet-loss-test/","name":"Packet Loss Test — Find Dropped Packets | WifiPlus","description":"Free packet loss test. Even 1-2% loss causes stalling video, dropped calls and rubber-banding in games while your speed test still looks normal.","inLanguage":"en","isPartOf":{"@id":"https://wifiplus.prathamgosai.in/#website"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://wifiplus.prathamgosai.in/og-image.png"},"breadcrumb":{"@id":"https://wifiplus.prathamgosai.in/packet-loss-test/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://wifiplus.prathamgosai.in/packet-loss-test/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://wifiplus.prathamgosai.in/"},{"@type":"ListItem","position":2,"name":"Packet loss test","item":"https://wifiplus.prathamgosai.in/packet-loss-test/"}]},{"@type":"WebApplication","name":"WifiPlus — Packet loss test","url":"https://wifiplus.prathamgosai.in/packet-loss-test/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript and a modern browser","inLanguage":"en","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Person","name":"Pratham Gosai"}},{"@type":"FAQPage","@id":"https://wifiplus.prathamgosai.in/packet-loss-test/#faq","inLanguage":"en","mainEntity":[{"@type":"Question","name":"How much packet loss is acceptable?","acceptedAnswer":{"@type":"Answer","text":"Effectively zero for real-time use. Under 1% is tolerable for browsing and downloads; above 1% degrades calls and games; above 5% makes normal use feel broken."}},{"@type":"Question","name":"Can packet loss cause buffering even on fast internet?","acceptedAnswer":{"@type":"Answer","text":"Yes, and it is one of the most common reasons for it. Lost packets force retransmission and slow the connection down, so a nominally fast line delivers stuttering video."}},{"@type":"Question","name":"How do I find what is dropping packets?","acceptedAnswer":{"@type":"Answer","text":"Test on WiFi, then on a cable to the same router. If loss disappears on the cable, the wireless hop is responsible. If it persists on the cable, test at different times — loss that only appears at peak hours usually indicates congestion upstream of your home."}}]}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/">WifiPlus</a>
+  <nav aria-label="Primary">
+    <a href="/">Full test</a>
+  </nav>
+</header>
+
+<main id="main">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Home</a></li>
+      <li aria-current="page">Packet loss test</li>
+    </ol>
+  </nav>
+
+  <article>
+    <h1>Packet loss test</h1>
+    <p class="standfirst">A connection can lose packets and still report a perfect download speed.</p>
+    
+
+    <!-- The live test. Same engine as the full tool: real bytes, no simulation.
+         Localised strings arrive as data attributes because CSP forbids inline
+         script, and landing.js reads them from here. -->
+    <section class="tool" aria-label="Packet loss test"
+      data-phase-ping="PING"
+      data-phase-download="DOWNLOAD"
+      data-phase-upload="UPLOAD"
+      data-status-latency="Measuring ping, jitter, packet loss and DNS…"
+      data-status-download="Measuring download and latency under load…"
+      data-status-upload="Measuring upload…"
+      data-status-failed="Test failed. Check your connection and try again."
+      data-label-again="AGAIN"
+      data-verdict-good="Your router keeps queues short. Calls and games hold up while other devices download."
+      data-verdict-queueing="Noticeable queueing. Enabling Smart Queue Management (SQM/fq_codel) on your router would fix this."
+      data-verdict-severe="Severe bufferbloat. Calls will break up whenever anyone else downloads — a router queue problem, not a speed problem.">
+      <div class="stage">
+        <button class="go" id="goButton" type="button">GO</button>
+        <p class="caption" id="goCaption">Press GO — about 6 seconds, no signup.</p>
+        <div class="readout" id="readout" hidden>
+          <p class="phase" id="phase">PING</p>
+          <p class="value"><span id="value">0.00</span> <span class="unit" id="unit">ms</span></p>
+          <div class="track"><span id="bar"></span></div>
+        </div>
+      </div>
+      <dl class="results" id="results" hidden>
+        <div><dt>Download</dt><dd id="rDownload">--<span>Mbps</span></dd></div>
+        <div><dt>Upload</dt><dd id="rUpload">--<span>Mbps</span></dd></div>
+        <div><dt>Ping</dt><dd id="rPing">--<span>ms</span></dd></div>
+        <div><dt>Jitter</dt><dd id="rJitter">--<span>ms</span></dd></div>
+        <div><dt>Packet loss</dt><dd id="rLoss">--<span>%</span></dd></div>
+        <div><dt>DNS</dt><dd id="rDns">--<span>ms</span></dd></div>
+        <div><dt>Bufferbloat</dt><dd id="rBloat">--<span>grade</span></dd></div>
+        <div><dt>Stability</dt><dd id="rStability">--<span>%</span></dd></div>
+      </dl>
+      <p class="status" id="status" role="status" aria-live="polite">Ready.</p>
+    </section>
+
+    <p>Packet loss is the share of data that never arrives and has to be sent again. Small amounts are normal on any network, but the effect is wildly disproportionate: 1-2% loss is enough to stall video, drop words out of calls and make games rubber-band, while a speed test that retransmits quietly in the background still reports a healthy number.</p>
+    <p>This test counts probes that never came back, as a percentage of probes actually sent. It is deliberately measured on small requests rather than during a bulk transfer, so what you see is the network dropping data — not your own download saturating the link and causing drops as a side effect.</p>
+
+    <h2>Why a little loss causes a lot of damage</h2>
+    <p>TCP, which carries most web traffic, treats loss as a congestion signal: it retransmits the missing data and then deliberately slows down. So loss costs you the round trip needed to notice and resend, plus a throughput reduction afterwards. Real-time traffic has it worse. Voice and video usually run over UDP with no retransmission at all, because a packet that arrives late is useless — so a lost packet is simply a gap you hear.</p>
+
+    <h2>Common causes</h2>
+    <p>On WiFi: weak signal, interference, and a band so congested that transmissions collide. On the wire: a failing cable, a dying port, or an overloaded link somewhere upstream. Inside your home: a router whose queues are full, which drops what it cannot hold. Persistent loss on a wired connection to the router almost always points at hardware or at the provider, and is worth reporting with evidence from repeated tests.</p>
+
+    <h2>Reading the result</h2>
+    <p>0% is what a healthy connection reports and what you should expect most of the time. Anything sustained above 1% will be noticeable in calls and games. Above 5%, ordinary browsing starts to feel broken. Loss that appears only while something else is downloading is a queue problem rather than a line fault — the bufferbloat test measures that case directly.</p>
+
+    <h2>What a browser can and cannot see</h2>
+    <p>Be aware of what this figure is. A web page cannot watch individual packets: TCP quietly resends anything that goes missing, so by the time data reaches the browser the loss has already been repaired and hidden. What this test measures is the share of its latency probes that never came back at all within a deadline. That is a genuine signal — a connection dropping whole requests is in worse shape than one merely resending packets — but it is a proxy, and it will read 0% on a line that is quietly retransmitting. A dedicated tool running outside the browser, or your router's own statistics, can see the real per-packet figure.</p>
+
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      <details><summary><h3>How much packet loss is acceptable?</h3></summary><p>Effectively zero for real-time use. Under 1% is tolerable for browsing and downloads; above 1% degrades calls and games; above 5% makes normal use feel broken.</p></details>
+      <details><summary><h3>Can packet loss cause buffering even on fast internet?</h3></summary><p>Yes, and it is one of the most common reasons for it. Lost packets force retransmission and slow the connection down, so a nominally fast line delivers stuttering video.</p></details>
+      <details><summary><h3>How do I find what is dropping packets?</h3></summary><p>Test on WiFi, then on a cable to the same router. If loss disappears on the cable, the wireless hop is responsible. If it persists on the cable, test at different times — loss that only appears at peak hours usually indicates congestion upstream of your home.</p></details>
+    </div>
+
+    <h2>Related tests</h2>
+    <ul class="related">
+        <li><a href="/ping-test/"><strong>Ping test</strong><span>Latency decides how responsive your connection feels. Speed does not.</span></a></li>
+        <li><a href="/jitter-test/"><strong>Jitter test</strong><span>Jitter is why a call breaks up on a connection whose speed test looks perfect.</span></a></li>
+        <li><a href="/bufferbloat-test/"><strong>Bufferbloat test</strong><span>This is the measurement that explains why your call falls apart the moment someone else starts a download.</span></a></li>
+    </ul>
+
+    <p class="cta"><a href="/">Run the full test — every metric in one pass →</a></p>
+  </article>
+</main>
+
+<footer class="bar foot">
+  <p>WifiPlus — real measurement, no signup, no ads.</p>
+</footer>
+
+<script type="module" src="/landing.js"></script>
+</body>
+</html>

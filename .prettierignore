@@ -1,0 +1,14 @@
+node_modules/
+web/.next/
+web/out/
+web/tsconfig.tsbuildinfo
+design/
+
+# The hand-written static shell is formatted by hand: index.html carries a 1,300-line
+# inline <style> block whose grouping is the documentation, and Prettier would reflow
+# all of it into one unreviewable diff. app.js and sw.js ship unbundled to the browser
+# and are kept deliberately close to the markup they drive.
+index.html
+app.js
+sw.js
+sitemap.xml

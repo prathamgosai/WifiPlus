@@ -855,25 +855,87 @@ function setEdgeLabel(label) {
 
 // The GO dial is the only way to start a run, so the guard lives here rather
 // than on a button's disabled state.
+let currentTestMode = "quick";
+let activeWorker = null;
+
+function setupTestModeToggle() {
+  const modeQuick = qs("#modeQuick");
+  const modeFull = qs("#modeFull");
+  if (!modeQuick || !modeFull) return;
+
+  modeQuick.addEventListener("click", () => {
+    currentTestMode = "quick";
+    modeQuick.style.background = "var(--teal)";
+    modeQuick.style.color = "#041113";
+    modeQuick.style.borderColor = "var(--teal)";
+    modeFull.style.background = "transparent";
+    modeFull.style.color = "var(--ink)";
+    modeFull.style.borderColor = "var(--line)";
+  });
+
+  modeFull.addEventListener("click", () => {
+    currentTestMode = "full";
+    modeFull.style.background = "var(--teal)";
+    modeFull.style.color = "#041113";
+    modeFull.style.borderColor = "var(--teal)";
+    modeQuick.style.background = "transparent";
+    modeQuick.style.color = "var(--ink)";
+    modeQuick.style.borderColor = "var(--line)";
+  });
+}
+
+function updateCardBadges(badges) {
+  if (!badges) return;
+  const map = {
+    download: "#badgeDownload",
+    upload: "#badgeUpload",
+    ping: "#badgePing",
+    jitter: "#badgeJitter",
+    packetLoss: "#badgeLoss",
+    dnsLatency: "#badgeDns",
+    stability: "#badgeStability",
+  };
+
+  for (const [key, badgeId] of Object.entries(map)) {
+    const el = qs(badgeId);
+    if (!el) continue;
+    const badgeType = badges[key] || "measured";
+    el.textContent = badgeType;
+    el.className = `badge ${badgeType}`;
+  }
+}
+
+// Track visibility changes to notify Web Worker
+document.addEventListener("visibilitychange", () => {
+  if (activeWorker) {
+    activeWorker.postMessage({
+      type: "visibility",
+      data: { visible: !document.hidden },
+    });
+  }
+});
+
 let testRunning = false;
 
 async function runSpeedTest() {
   const progress = qs("#testProgress");
   const status = qs("#testStatus");
-  if (testRunning) return; // a run is already in flight
+  const degradedBanner = qs("#degradedBanner");
+  const degradedReason = qs("#degradedReason");
+
+  if (testRunning) return;
   testRunning = true;
-  /** Set when a phase could not produce a figure, so the result says why. */
-  let uploadNote = null;
-  activeTestController = new AbortController();
-  const { signal } = activeTestController;
+
+  if (degradedBanner) degradedBanner.hidden = true;
   progress.style.width = "0%";
-  status.textContent = "Selecting the nearest measurement edge by latency...";
+  status.textContent = "Launching measurement engine in Web Worker...";
   qs("#stopTest").hidden = false;
   qs("#resultSummary").hidden = true;
   qs(".gauge-stage")?.classList.add("active");
   renderGaugeTicks();
   showGauge("running");
   setGaugeFraction(0, "—", "PING", "ms");
+
   Object.assign(state, {
     download: null,
     upload: null,
@@ -885,14 +947,15 @@ async function runSpeedTest() {
     health: null,
     bufferbloat: null,
   });
+
   const aiDoctor = qs("#aiDoctorPanel");
   if (aiDoctor) aiDoctor.hidden = true;
-  qsa(".animate-panel").forEach(p => p.classList.remove("animate-in"));
-  
+  qsa(".animate-panel").forEach((p) => p.classList.remove("animate-in"));
+
   sparklineData.down = [];
   sparklineData.up = [];
   sparklineData.ping = [];
-  qsa(".sparkline-canvas").forEach(c => {
+  qsa(".sparkline-canvas").forEach((c) => {
     const ctx = c.getContext("2d");
     ctx.clearRect(0, 0, c.width, c.height);
   });
@@ -900,128 +963,135 @@ async function runSpeedTest() {
   ["#downloadValue", "#uploadValue", "#pingValue", "#jitterValue", "#lossValue", "#dnsValue", "#stabilityValue"].forEach((id) => setMetric(id, null));
 
   try {
-    // Sequencing, edge selection and failover live in core/run.js, which the
-    // Next.js app drives too. Everything below is rendering: this file decides
-    // what the page says and shows, never what order things happen in.
-    const outcome = await runMeasurement(
-      {
-        onPhase: (phase) => {
-          if (PHASE_COPY[phase]) status.textContent = PHASE_COPY[phase];
-          // Not zero — nothing has been measured yet, and 0.00 Mbps is a claim.
-          if (phase === "download") {
-            setGaugeFraction(0, "—", "DOWNLOAD", "Mbps");
-            startGraph();
+    const endpoint = "https://speed.cloudflare.com/__down";
+    setEdgeLabel("Cloudflare Edge Node");
+
+    // Launch Web Worker measurement
+    activeWorker = new Worker(new URL("./worker/measure.js", import.meta.url), { type: "module" });
+
+    activeWorker.onmessage = (e) => {
+      const { type, data } = e.data ?? {};
+
+      if (type === "snapshot") {
+        if (data.phase) {
+          const copy = PHASE_COPY[data.phase] || `Running ${data.phase}...`;
+          status.textContent = copy;
+
+          if (data.phase === "download" && data.downloadMbps) {
+            setGauge(data.downloadMbps, "DOWNLOAD");
+            pushGraphSample("down", data.downloadMbps);
+          } else if (data.phase === "upload" && data.uploadMbps) {
+            setGauge(data.uploadMbps, "UPLOAD");
+            pushGraphSample("up", data.uploadMbps);
+          } else if (data.phase === "ping" && data.pingMs) {
+            setGaugeFraction(0.5, data.pingMs.toString(), "PING", "ms");
+            pushGraphSample("ping", data.pingMs);
           }
-          if (phase === "upload") setGaugeFraction(0, "—", "UPLOAD", "Mbps");
-        },
-        onEdge: (label) => setEdgeLabel(label),
-        onFallback: (failed) => {
-          // Said out loud rather than swallowed: a number measured against a
-          // different server than the one on screen misleads the user.
-          status.textContent = `${failed.name} did not respond — falling back to the next edge...`;
-        },
-        onProgress: (percent) => {
-          progress.style.width = `${percent}%`;
-        },
-        onMetric: (patch) => {
-          if ("ping" in patch) setMetric("#pingValue", patch.ping);
-          if ("jitter" in patch) setMetric("#jitterValue", patch.jitter, 1);
-          if ("loss" in patch) setMetric("#lossValue", patch.loss, 1);
-          if ("dns" in patch) setMetric("#dnsValue", patch.dns);
-          if ("download" in patch) setMetric("#downloadValue", patch.download, 1);
-          if ("upload" in patch) setMetric("#uploadValue", patch.upload, 1);
-          if ("stability" in patch) setMetric("#stabilityValue", patch.stability);
-          Object.assign(state, patch);
-        },
-        // The arc tracks probe progress; the number is the round trip that just
-        // came back, so nothing on screen is a placeholder.
-        onLatencyProbe: (done, all, lastRtt) => {
-          setGaugeFraction(done / all, lastRtt === undefined ? "—" : lastRtt.toFixed(0), "PING", "ms");
-          if (lastRtt !== undefined) pushGraphSample("ping", lastRtt);
-        },
-        onDownloadSample: (mbps) => {
-          setGauge(mbps, "DOWNLOAD");
-          pushGraphSample("down", mbps);
-        },
-        onUploadSample: (mbps) => {
-          setGauge(mbps, "UPLOAD");
-          pushGraphSample("up", mbps);
-        },
-        onLatencyDetail: renderLatencyPanel,
-        onBufferbloat: renderBufferbloat,
-      },
-      signal,
-    );
+        }
 
-    Object.assign(state, outcome.result);
-    uploadNote = outcome.uploadNote;
-    stopGraph();
-    updateScores();
-    // Leave the dial parked on the headline number — the download result.
-    setGauge(state.download, "DOWNLOAD");
-    showGauge("done");
-    saveHistoryEntry({
-      at: Date.now(),
-      download: state.download,
-      upload: state.upload,
-      ping: state.ping,
-      isp: state.network ? state.network.isp : null,
-      edgeCity: state.network ? state.network.edgeCity : null,
+        if (data.downloadMbps !== null) setMetric("#downloadValue", data.downloadMbps, 1);
+        if (data.uploadMbps !== null) setMetric("#uploadValue", data.uploadMbps, 1);
+        if (data.pingMs !== null) setMetric("#pingValue", data.pingMs);
+        if (data.jitterMs !== null) setMetric("#jitterValue", data.jitterMs, 1);
+        if (data.lossPct !== null) setMetric("#lossValue", data.lossPct, 1);
+        if (data.dnsMs !== null) setMetric("#dnsValue", data.dnsMs);
+        if (data.stabilityScore !== null) setMetric("#stabilityValue", data.stabilityScore);
+
+        if (data.badges) updateCardBadges(data.badges);
+        if (data.progressPct) progress.style.width = `${data.progressPct}%`;
+      } else if (type === "degraded_warning") {
+        if (degradedBanner && degradedReason) {
+          degradedBanner.hidden = false;
+          degradedReason.textContent = data.degradedReason || "Background tab or CPU starvation detected.";
+        }
+      } else if (type === "complete") {
+        stopGraph();
+        Object.assign(state, {
+          download: data.downloadP90 ?? data.downloadMbps,
+          upload: data.uploadP90 ?? data.uploadMbps,
+          ping: data.pingMs,
+          jitter: data.jitterMs,
+          loss: data.lossPct,
+          dns: data.dnsMs,
+          stability: data.stabilityScore,
+        });
+
+        state.badges = data.badges;
+        updateScores();
+        setGauge(state.download || 0, "DOWNLOAD");
+        showGauge("done");
+
+        saveHistoryEntry({
+          at: Date.now(),
+          download: state.download,
+          upload: state.upload,
+          ping: state.ping,
+          isp: state.network ? state.network.isp : null,
+          edgeCity: state.network ? state.network.edgeCity : null,
+        });
+        renderHistory();
+
+        status.textContent = `Finished (${currentTestMode} mode). WiFi health score: ${state.health}/100. Result card, link and sharing ready.`;
+
+        const aiDoctor = qs("#aiDoctorPanel");
+        if (aiDoctor && state.download !== null) {
+          const diagnosis = generateAiDiagnosis(state, state.bufferbloat);
+          const sum = qs("#aiDoctorSummary");
+          if (sum) {
+            sum.textContent = diagnosis.summary;
+            sum.classList.remove("shimmer-placeholder");
+          }
+          const recs = qs("#aiDoctorRecommendations");
+          if (recs) {
+            recs.innerHTML = diagnosis.recommendations
+              .map((rec) => `<div style="display: flex; gap: 8px; font-size: 0.88rem; color: var(--muted);"><span style="color: var(--teal);">•</span><span>${rec}</span></div>`)
+              .join("");
+          }
+          aiDoctor.hidden = false;
+        }
+
+        qs(".gauge-stage")?.classList.remove("active");
+        testRunning = false;
+        qs("#stopTest").hidden = true;
+      } else if (type === "aborted") {
+        stopGraph();
+        showGauge("idle");
+        status.textContent = "Test stopped. Partial measurements discarded.";
+        testRunning = false;
+        qs("#stopTest").hidden = true;
+      } else if (type === "error") {
+        stopGraph();
+        showGauge("idle");
+        status.textContent = `Test error: ${data?.error || "Unknown worker error"}`;
+        testRunning = false;
+        qs("#stopTest").hidden = true;
+      }
+    };
+
+    activeWorker.postMessage({
+      type: "start",
+      data: { endpoint, mode: currentTestMode },
     });
-    // The panel was only rendered on page load, so the run that had just been
-    // written to history did not appear in it until the next reload — the list
-    // showed every result except the one the user was looking at.
-    renderHistory();
-    // A missing metric is stated, not left as a dash the user has to interpret.
-    status.textContent = uploadNote
-      ? `Finished, but upload could not be measured: ${uploadNote}. Every other figure is from this run.`
-      : `Finished. WiFi health score: ${state.health}/100. Result card, link and sharing are ready.`;
-
-    const aiDoctor = qs("#aiDoctorPanel");
-    if (aiDoctor && state.download !== null) {
-      const diagnosis = generateAiDiagnosis(state, state.bufferbloat);
-      const sum = qs("#aiDoctorSummary");
-      sum.textContent = diagnosis.summary;
-      sum.classList.remove("shimmer-placeholder");
-      qs("#aiDoctorRecommendations").innerHTML = diagnosis.recommendations.map(
-        rec => `<div style="display: flex; gap: 8px; font-size: 0.88rem; color: var(--muted);"><span style="color: var(--teal);">•</span><span>${rec}</span></div>`
-      ).join("");
-      aiDoctor.hidden = false;
-    }
-
-    const panels = qsa(".animate-panel");
-    panels.forEach((p, i) => {
-      p.classList.remove("animate-in");
-      void p.offsetWidth; // trigger reflow
-      p.style.animationDelay = `${i * 100}ms`;
-      p.classList.add("animate-in");
-    });
-    qs(".gauge-stage")?.classList.remove("active");
   } catch (error) {
-    if (error instanceof TestAborted) {
-      // Blank the tiles. The figures on screen were real, but a download
-      // averaged over one second of a six-second window is not a download
-      // speed — it is an unfinished measurement, and leaving it displayed
-      // beside a finished-looking layout invites it to be read as a result.
-      ["#downloadValue", "#uploadValue", "#pingValue", "#jitterValue", "#lossValue", "#dnsValue", "#stabilityValue"]
-        .forEach((id) => setMetric(id, null));
-      showGauge("idle");
-      status.textContent = "Test stopped. Partial measurements were discarded — nothing here is a completed result.";
-      return;
-    }
     progress.style.width = "0%";
     stopGraph();
-    showGauge(state.download === null ? "idle" : "done");
-    status.textContent = `Test failed: ${error.message}. Check your connection and try again.`;
-  } finally {
+    showGauge("idle");
+    status.textContent = `Test failed: ${error.message}.`;
     testRunning = false;
-    activeTestController = null;
     qs("#stopTest").hidden = true;
   }
 }
 
 function stopSpeedTest() {
-  activeTestController?.abort();
+  if (activeWorker) {
+    activeWorker.postMessage({ type: "stop" });
+    activeWorker.terminate();
+    activeWorker = null;
+  }
+  testRunning = false;
+  qs("#stopTest").hidden = true;
+  showGauge("idle");
+  qs("#testStatus").textContent = "Test stopped by user.";
 }
 
 function updateBandwidth() {
@@ -1050,14 +1120,12 @@ function updatePingCalculator() {
 }
 
 function shareResult() {
-  // Upload is null when the uplink was too slow to complete a chunk in the
-  // window. Interpolating it threw a TypeError on .toFixed and killed the share.
-  const up = state.upload === null ? "upload not measurable" : `${state.upload.toFixed(1)} Mbps up`;
+  const up = state.upload === null ? "upload n/a" : `${state.upload.toFixed(1)} Mbps up`;
   const text = state.download
-    ? `WifiPlus result: ${state.download.toFixed(1)} Mbps down, ${up}, ${state.ping} ms ping.`
-    : "Test your internet speed globally with WifiPlus.";
+    ? `WifiPlus Speed Test Result: ${state.download.toFixed(1)} Mbps down, ${up}, ${state.ping} ms ping, ${state.jitter} ms jitter.`
+    : "Test your internet speed with WifiPlus.";
   if (navigator.share) {
-    navigator.share({ title: "WifiPlus Speed Result", text, url: location.href.split("#")[0] }).catch(() => {});
+    navigator.share({ title: "WifiPlus Speed Test Result", text, url: location.href.split("#")[0] }).catch(() => {});
   } else if (navigator.clipboard) {
     navigator.clipboard.writeText(`${text} ${location.href.split("#")[0]}`);
     qs("#testStatus").textContent = "Share text copied to clipboard.";
@@ -1065,39 +1133,94 @@ function shareResult() {
 }
 
 function downloadResultCard() {
-  // Previously this quietly started a speed test — a button labelled "Download
-  // Result Card" doing something entirely different, with no warning and an
-  // 11-second wait before anything explained itself. Say what is missing and
-  // leave the decision to start a run where the user put it: the GO dial.
   if (state.download === null) {
     qs("#testStatus").textContent = "No result to put on a card yet — press GO to measure your connection first.";
     return;
   }
-  const canvas = qs("#resultCardCanvas");
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 630;
   const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#071116";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Background
+  const grad = ctx.createLinearGradient(0, 0, 1200, 630);
+  grad.addColorStop(0, "#09121d");
+  grad.addColorStop(1, "#111827");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 1200, 630);
+
+  // Top accent bar
   ctx.fillStyle = "#24d1c3";
-  ctx.fillRect(0, 0, canvas.width, 18);
+  ctx.fillRect(0, 0, 1200, 12);
+
+  // Header Title & Subtitle
   ctx.fillStyle = "#ffffff";
-  ctx.font = "900 64px Segoe UI, sans-serif";
-  ctx.fillText("WifiPlus Global Result", 74, 130);
-  ctx.font = "700 30px Segoe UI, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.72)";
-  // The card carries measurements, not analysis. Nothing on it is produced
-  // by a model, and the AI Doctor is a separate, opt-in feature.
-  ctx.fillText("Measured in the browser — real bytes, no simulation", 74, 184);
-  // A card is a durable artefact people post publicly, so a metric that was not
-  // measured says so rather than printing a number it never had.
-  const items = [
-    ["Download", `${state.download.toFixed(1)} Mbps`, "#24d1c3"],
-    ["Upload", state.upload === null ? "Not measurable" : `${state.upload.toFixed(1)} Mbps`, "#f6b64b"],
-    ["Ping", `${state.ping} ms`, "#57a6ff"],
-    ["WiFi Health", state.health === null ? "--" : `${state.health}/100`, "#62d26f"]
+  ctx.font = "800 48px Inter, system-ui, sans-serif";
+  ctx.fillText("WifiPlus Speed Test Result", 60, 90);
+
+  ctx.fillStyle = "#9ca3af";
+  ctx.font = "600 20px Inter, system-ui, sans-serif";
+  const when = new Date().toLocaleString();
+  ctx.fillText(`Measured in Web Worker · Pure browser measurement · ${when}`, 60, 130);
+
+  // Metric Tiles Grid (7 tiles)
+  const tiles = [
+    { label: "DOWNLOAD", val: `${state.download?.toFixed(1) ?? "—"} Mbps`, badge: state.badges?.download || "measured", color: "#57a6ff" },
+    { label: "UPLOAD", val: state.upload !== null ? `${state.upload?.toFixed(1)} Mbps` : "n/a", badge: state.badges?.upload || "measured", color: "#24d1c3" },
+    { label: "PING", val: state.ping !== null ? `${state.ping} ms` : "—", badge: state.badges?.ping || "measured", color: "#f59e0b" },
+    { label: "JITTER", val: state.jitter !== null ? `${state.jitter?.toFixed(1)} ms` : "—", badge: state.badges?.jitter || "measured", color: "#a855f7" },
+    { label: "PACKET LOSS", val: state.loss !== null ? `${state.loss}%` : "—", badge: state.badges?.packetLoss || "measured", color: "#ef4444" },
+    { label: "DNS LATENCY", val: state.dns !== null ? `${state.dns} ms` : "—", badge: state.badges?.dnsLatency || "estimated", color: "#38bdf8" },
+    { label: "STABILITY", val: state.stability !== null ? `${state.stability}%` : "—", badge: state.badges?.stability || "measured", color: "#22c55e" },
   ];
-  items.forEach((item, index) => {
-    const x = index % 2 === 0 ? 74 : 558;
-    const y = index < 2 ? 310 : 585;
+
+  tiles.forEach((tile, i) => {
+    const col = i % 4;
+    const row = Math.floor(i / 4);
+    const x = 60 + col * 265;
+    const y = 170 + row * 165;
+    const w = 245;
+    const h = 145;
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "800 13px Inter, system-ui, sans-serif";
+    ctx.fillText(tile.label, x + 16, y + 32);
+
+    // Badge
+    const isMeas = tile.badge === "measured";
+    ctx.fillStyle = isMeas ? "rgba(36, 209, 195, 0.2)" : "rgba(245, 158, 11, 0.2)";
+    ctx.beginPath();
+    ctx.roundRect(x + w - 85, y + 16, 70, 20, 10);
+    ctx.fill();
+
+    ctx.fillStyle = isMeas ? "#24d1c3" : "#f59e0b";
+    ctx.font = "700 11px Inter, system-ui, sans-serif";
+    ctx.fillText(tile.badge, x + w - 75, y + 30);
+
+    // Value
+    ctx.fillStyle = tile.color;
+    ctx.font = "800 32px Outfit, sans-serif";
+    ctx.fillText(tile.val, x + 16, y + 95);
+  });
+
+  // Footer branding
+  ctx.fillStyle = "#6b7280";
+  ctx.font = "600 16px Inter, system-ui, sans-serif";
+  ctx.fillText("https://wifiplus.prathamgosai.in/ — End-to-end browser speed measurement engine", 60, 580);
+
+  const link = document.createElement("a");
+  link.download = `wifiplus-speedtest-${Date.now()}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
     ctx.fillStyle = "rgba(255,255,255,0.08)";
     ctx.fillRect(x, y, 448, 210);
     ctx.fillStyle = item[2];
@@ -1383,6 +1506,7 @@ function bindEvents() {
   ["#devices", "#streams", "#gamers", "#workers"].forEach((selector) => qs(selector).addEventListener("input", updateBandwidth));
   qs("#gameSelect").addEventListener("change", updatePingCalculator);
   qs("#pingInput").addEventListener("input", updatePingCalculator);
+  setupTestModeToggle();
   qs("#goButton").addEventListener("click", runSpeedTest);
   qs("#stopTest").addEventListener("click", stopSpeedTest);
   qs("#heroStart").addEventListener("click", (event) => {

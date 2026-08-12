@@ -1004,6 +1004,35 @@
       text-transform: uppercase;
     }
 
+    .metric-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: lowercase;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .badge.measured {
+      background: color-mix(in srgb, var(--teal) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--teal) 45%, transparent);
+      color: var(--teal);
+    }
+
+    .badge.estimated {
+      background: color-mix(in srgb, var(--amber) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+      color: var(--amber);
+    }
+
     .metric-value {
       display: flex;
       align-items: baseline;
@@ -2400,7 +2429,16 @@
             </div>
           </div>
 
+          <div id="degradedBanner" hidden style="background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #f87171; padding: 12px 16px; border-radius: 10px; margin-bottom: 14px; font-size: 0.88rem; font-weight: 700;">
+            ⚠️ Degraded Run: <span id="degradedReason">Background tab or CPU starvation detected.</span>
+          </div>
+
           <div class="gauge-stage">
+            <div class="test-mode-toggle" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 14px;">
+              <button type="button" id="modeQuick" style="padding: 6px 16px; border-radius: 20px; font-weight: 800; border: 1px solid var(--teal); background: var(--teal); color: #041113; cursor: pointer;">Quick (~12s)</button>
+              <button type="button" id="modeFull" style="padding: 6px 16px; border-radius: 20px; font-weight: 800; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer;">Full (~30s)</button>
+            </div>
+
             <button class="go-button" id="goButton" type="button" aria-label="Start WiFi speed test">GO</button>
             <p class="go-caption" id="goCaption">Press GO to test your WiFi — about 11 seconds, no signup.</p>
 
@@ -2440,40 +2478,61 @@
 
           <div class="metric-grid">
             <article class="metric featured">
-              <span class="metric-label">Download</span>
+              <div class="metric-header">
+                <span class="metric-label">Download</span>
+                <span class="badge measured" id="badgeDownload">measured</span>
+              </div>
               <div class="metric-value" data-empty="true"><span id="downloadValue">—</span><span class="unit">Mbps</span></div>
               <p>Measures how fast data is received from the nearest edge node.</p>
               <canvas class="sparkline-canvas" id="sparklineDownload" aria-hidden="true"></canvas>
             </article>
             <article class="metric">
-              <span class="metric-label">Upload</span>
+              <div class="metric-header">
+                <span class="metric-label">Upload</span>
+                <span class="badge measured" id="badgeUpload">measured</span>
+              </div>
               <div class="metric-value" data-empty="true"><span id="uploadValue">—</span><span class="unit">Mbps</span></div>
               <p>Measures how fast data is sent to the network.</p>
               <canvas class="sparkline-canvas" id="sparklineUpload" aria-hidden="true"></canvas>
             </article>
             <article class="metric">
-              <span class="metric-label">Ping</span>
+              <div class="metric-header">
+                <span class="metric-label">Ping</span>
+                <span class="badge measured" id="badgePing">measured</span>
+              </div>
               <div class="metric-value" data-empty="true"><span id="pingValue">—</span><span class="unit">ms</span></div>
               <p>Lower latency is better for gaming and calls.</p>
               <canvas class="sparkline-canvas" id="sparklinePing" aria-hidden="true"></canvas>
             </article>
             <article class="metric">
-              <span class="metric-label">Jitter</span>
+              <div class="metric-header">
+                <span class="metric-label">Jitter</span>
+                <span class="badge measured" id="badgeJitter">measured</span>
+              </div>
               <div class="metric-value" data-empty="true"><span id="jitterValue">—</span><span class="unit">ms</span></div>
               <p>Measures latency consistency over time.</p>
             </article>
             <article class="metric">
-              <span class="metric-label">Packet loss</span>
+              <div class="metric-header">
+                <span class="metric-label" id="labelLoss">Packet loss</span>
+                <span class="badge measured" id="badgeLoss">measured</span>
+              </div>
               <div class="metric-value" data-empty="true"><span id="lossValue">—</span><span class="unit">%</span></div>
               <p>Share of latency probes that never came back. A browser cannot observe true packet loss — TCP hides it by resending — so this is the closest proxy available.</p>
             </article>
             <article class="metric">
-              <span class="metric-label">DNS latency</span>
+              <div class="metric-header">
+                <span class="metric-label">DNS latency</span>
+                <span class="badge estimated" id="badgeDns">estimated</span>
+              </div>
               <div class="metric-value" data-empty="true"><span id="dnsValue">—</span><span class="unit">ms</span></div>
               <p>Time for an uncached lookup through Cloudflare's DNS-over-HTTPS resolver — not the resolver your system is set to use, which a browser cannot query.</p>
             </article>
             <article class="metric">
-              <span class="metric-label">Stability</span>
+              <div class="metric-header">
+                <span class="metric-label">Stability</span>
+                <span class="badge measured" id="badgeStability">measured</span>
+              </div>
               <div class="metric-value" data-empty="true"><span id="stabilityValue">—</span><span class="unit">%</span></div>
               <p>Combines jitter, packet loss, and variance.</p>
             </article>

@@ -12,6 +12,7 @@ import { uploadRoutes } from "./routes/upload";
 import { pingRoutes } from "./routes/ping";
 import { dnsRoutes } from "./routes/dns";
 import { serverRoutes } from "./routes/servers";
+import { webrtcRoutes } from "./routes/webrtc";
 
 /**
  * Canonical path prefix. Everything is served here AND at the bare paths the
@@ -22,7 +23,7 @@ import { serverRoutes } from "./routes/servers";
 export const API_PREFIX = "/api/speedtest";
 
 /** Measurement routes are exempt from rate limiting — a real test fires many. */
-const MEASUREMENT_PATHS = ["/download", "/upload", "/ping", "/ws"];
+const MEASUREMENT_PATHS = ["/download", "/upload", "/ping", "/ws", "/webrtc"];
 
 function isMeasurement(url: string): boolean {
   // Compare the path only: a cache-buster in the query string must not decide
@@ -58,7 +59,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     origin: config.allowedOrigins.length > 0 ? config.allowedOrigins : true,
     methods: ["GET", "POST", "OPTIONS"],
     // Let the browser read the timing headers the download route exposes.
-    exposedHeaders: ["Content-Length", "Timing-Allow-Origin"],
+    exposedHeaders: ["Content-Length", "Timing-Allow-Origin", "Server-Timing"],
     maxAge: 86_400,
   });
 
@@ -103,6 +104,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
       `${API_PREFIX}/download?bytes=N`,
       `${API_PREFIX}/upload`,
       `${API_PREFIX}/dns`,
+      `${API_PREFIX}/webrtc/config`,
     ],
   }));
 
@@ -117,6 +119,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
     await scope.register(pingRoutes);
     await scope.register(dnsRoutes(config));
     await scope.register(serverRoutes(config));
+    await scope.register(webrtcRoutes(config));
   };
 
   await app.register(measurementRoutes, { prefix: API_PREFIX });

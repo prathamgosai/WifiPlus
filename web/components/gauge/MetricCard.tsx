@@ -141,11 +141,11 @@ export function MetricCard({
         )}
       </div>
 
-      <p className="tabular mt-2.5 font-display text-[1.6rem] font-extrabold leading-none tracking-tight">
-        <span className={hasValue ? undefined : "text-[color:var(--page-fg-muted)]/45"}>
+      <p className="tabular mt-2.5 font-display text-[1.45rem] font-extrabold leading-none tracking-tight flex items-baseline gap-1.5 flex-wrap min-w-0 max-w-full">
+        <span className={hasValue ? "truncate" : "text-[color:var(--page-fg-muted)]/45"}>
           {display ?? (hasValue ? smooth.toFixed(digits) : "—")}
         </span>
-        <span className="ms-1.5 font-sans text-[0.6875rem] font-bold text-[color:var(--page-fg-muted)]">
+        <span className="font-sans text-[0.6875rem] font-bold text-[color:var(--page-fg-muted)] shrink-0 whitespace-nowrap">
           {unit}
         </span>
       </p>

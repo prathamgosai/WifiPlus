@@ -963,6 +963,8 @@
       gap: 4px;
       backdrop-filter: blur(18px);
       box-shadow: var(--elev-1), var(--edge-light);
+      min-width: 0;
+      overflow: hidden;
     }
 
     /* The note is pinned to the bottom deliberately, so the VALUES align across
@@ -1005,10 +1007,10 @@
     .metric-value {
       display: flex;
       align-items: baseline;
-      gap: 8px;
-      margin: 12px 0 8px;
+      gap: 6px;
+      margin: 10px 0 6px;
       font-family: 'Outfit', sans-serif;
-      font-size: clamp(1.9rem, 3.8vw, 4.2rem);
+      font-size: clamp(1.6rem, 3.2vw, 3.6rem);
       /* Capped at 700 for the same reason as the dial readout: heavier faces in
          this stack drop tabular figures, and a value that changes width while
          it updates is the most obvious craft failure a speed test can have. */
@@ -1023,17 +1025,22 @@
          Inter ships tabular figures; this is the whole fix. */
       font-variant-numeric: tabular-nums;
       font-feature-settings: "tnum" 1, "cv01" 1;
+      max-width: 100%;
+      flex-wrap: wrap;
+      min-width: 0;
     }
 
     .metric:not(.featured) .metric-value {
-      font-size: clamp(1.6rem, 2.6vw, 2.8rem);
+      font-size: clamp(1.35rem, 2.0vw, 2.2rem);
     }
 
     .unit {
       color: var(--muted);
-      font-size: 0.94rem;
+      font-size: 0.85rem;
       font-weight: 600;
       letter-spacing: 0.01em;
+      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     /* Empty state.

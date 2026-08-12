@@ -56,6 +56,9 @@
   <link rel="preconnect" href="https://speed.cloudflare.com" crossorigin>
   <link rel="preconnect" href="https://cloudflare-dns.com" crossorigin>
   <link rel="dns-prefetch" href="https://speed.cloudflare.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <!-- app.js is an ES module that imports the shared engine from core/. Preloading
        the modules it pulls in removes the request waterfall that would otherwise
        delay the first paint of the dial by one round trip per module. -->
@@ -150,22 +153,27 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #071116;
-      --bg-soft: #0c1b22;
-      --panel: rgba(255, 255, 255, 0.08);
-      --panel-solid: #10222b;
+      --bg: #06090f;
+      --bg-soft: #0b0e14;
+      --panel: rgba(16, 25, 38, 0.58);
+      --panel-solid: #10131a;
       --paper: #ffffff;
-      --ink: #f5fbff;
-      --muted: #a8b8c2;
-      --line: rgba(255, 255, 255, 0.16);
-      --strong-line: rgba(255, 255, 255, 0.28);
-      --teal: #24d1c3;
-      --green: #62d26f;
-      --amber: #f6b64b;
-      --coral: #f36d5d;
-      --blue: #57a6ff;
-      --violet: #a98cff;
-      --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+      --ink: #e0e2eb;
+      --muted: #849495;
+      --line: rgba(255, 255, 255, 0.12);
+      --strong-line: rgba(0, 242, 255, 0.35);
+      --teal: #00f2ff;
+      --cyber-cyan: #00f2ff;
+      --cyber-violet: #7000ff;
+      --green: #00e676;
+      --amber: #ffb300;
+      --coral: #ff5252;
+      --blue: #00dbe7;
+      --violet: #7000ff;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+      --cyber-glow: 0 0 25px rgba(0, 242, 255, 0.4);
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
     }
 
     html[data-theme="light"] {
@@ -196,9 +204,14 @@
       min-width: 320px;
       min-height: 100dvh;
       padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-      background: var(--bg);
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(ellipse 70% 45% at 50% -10%, rgba(0, 242, 255, 0.14), transparent),
+        linear-gradient(to right, rgba(0, 242, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 242, 255, 0.04) 1px, transparent 1px);
+      background-size: 100% 100%, 32px 32px, 32px 32px;
       color: var(--ink);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: var(--font-sans);
       line-height: 1.5;
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
@@ -659,34 +672,45 @@
       align-items: center;
       justify-content: center;
       gap: 14px;
-      min-height: 340px;
-      padding: 18px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
+      min-height: 350px;
+      padding: 22px;
+      border: 1px solid rgba(0, 242, 255, 0.22);
+      border-top: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 16px;
       background:
-        radial-gradient(120% 120% at 50% 12%, color-mix(in srgb, var(--teal) 12%, transparent), transparent 62%),
-        var(--panel);
-      backdrop-filter: blur(18px);
+        radial-gradient(120% 120% at 50% 12%, rgba(0, 242, 255, 0.16), transparent 68%),
+        rgba(16, 25, 38, 0.65);
+      backdrop-filter: blur(24px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 242, 255, 0.12);
       overflow: hidden;
+      transition: background 0.4s ease, border-color 0.4s ease;
+    }
+    .gauge-stage.active {
+      border-color: rgba(0, 242, 255, 0.5);
+      background:
+        radial-gradient(120% 120% at 50% 12%, rgba(0, 242, 255, 0.28), transparent 72%),
+        rgba(16, 25, 38, 0.75);
+      box-shadow: 0 20px 70px rgba(0, 0, 0, 0.6), 0 0 45px rgba(0, 242, 255, 0.25);
     }
 
     .go-button {
       position: relative;
-      width: 190px;
-      height: 190px;
+      width: 196px;
+      height: 196px;
       border: 0;
       border-radius: 50%;
-      background: var(--panel-solid);
-      color: var(--ink);
-      font-family: inherit;
-      font-size: 2.5rem;
+      background: radial-gradient(circle at 35% 35%, #162432, #080d14);
+      color: #00f2ff;
+      font-family: var(--font-mono);
+      font-size: 2.7rem;
       font-weight: 800;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       cursor: pointer;
       display: grid;
       place-items: center;
-      box-shadow: var(--shadow);
+      box-shadow: 0 0 30px rgba(0, 242, 255, 0.35), var(--shadow);
       transition: transform 0.25s ease, box-shadow 0.25s ease;
+      animation: pulseGlow 3s infinite ease-in-out;
     }
 
     /* Brand ring, drawn as a masked border so it never affects layout. */
@@ -965,6 +989,7 @@
     #latMin, #latMedian, #latP95, #latMax,
     #wifiScore, #gamingScore, #streamingScore, #videoScore, #workScore, #dnsScore,
     #bandwidthResult, #pingGrade, #summaryHealth, #latencyProbes, #bloatDelta {
+      font-family: 'Outfit', sans-serif;
       font-variant-numeric: tabular-nums;
       font-feature-settings: "tnum" 1;
     }
@@ -982,6 +1007,7 @@
       align-items: baseline;
       gap: 8px;
       margin: 12px 0 8px;
+      font-family: 'Outfit', sans-serif;
       font-size: clamp(1.9rem, 3.8vw, 4.2rem);
       /* Capped at 700 for the same reason as the dial readout: heavier faces in
          this stack drop tabular figures, and a value that changes width while
@@ -1638,6 +1664,44 @@
       display: none;
     }
 
+    /* --- Pro Max Animations --- */
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 20%, transparent), var(--shadow); }
+      50% { box-shadow: 0 0 0 18px transparent, var(--shadow); }
+      100% { box-shadow: 0 0 0 0 transparent, var(--shadow); }
+    }
+    
+    @keyframes shimmerSweep {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    
+    @keyframes slideUpFade {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .shimmer {
+      background: linear-gradient(90deg, color-mix(in srgb, var(--line) 40%, transparent) 25%, color-mix(in srgb, var(--line) 80%, transparent) 50%, color-mix(in srgb, var(--line) 40%, transparent) 75%);
+      background-size: 200% 100%;
+      animation: shimmerSweep 1.5s infinite linear;
+      border-radius: 4px;
+      color: transparent !important;
+      pointer-events: none;
+    }
+
+    .animate-in {
+      opacity: 0;
+      animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    
+    .sparkline-canvas {
+      width: 100%;
+      height: 36px;
+      margin-top: 8px;
+      border-radius: 4px;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       html {
         scroll-behavior: auto;
@@ -2291,6 +2355,15 @@
             <div class="stat-pill"><strong>15</strong><span>interface languages</span></div>
             <div class="stat-pill"><strong>Free</strong><span>no signup required</span></div>
           </div>
+
+          <div id="aiDoctorPanel" class="card animate-panel" hidden style="margin-top: 34px; border-color: color-mix(in srgb, var(--teal) 45%, var(--line));">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+              <div class="icon-box" style="margin-bottom: 0; width: 36px; height: 36px; font-size: 1.2rem;">✨</div>
+              <h3 style="margin: 0;">AI Network Diagnosis</h3>
+            </div>
+            <p id="aiDoctorSummary" class="shimmer-placeholder" style="font-size: 0.95rem; line-height: 1.6; margin-bottom: 16px; font-weight: 500;"></p>
+            <div id="aiDoctorRecommendations" style="display: grid; gap: 10px;"></div>
+          </div>
         </div>
 
         <div class="test-lab" aria-label="Internet speed test dashboard">
@@ -2300,7 +2373,7 @@
           <div class="conn-strip" id="connStrip" aria-live="polite">
             <div class="conn-item">
               <span class="conn-key">Provider</span>
-              <strong class="conn-val" id="connIsp">Detecting…</strong>
+              <strong class="conn-val shimmer" id="connIsp">Detecting...</strong>
               <span class="conn-sub" id="connAsn"></span>
             </div>
             <div class="conn-item">
@@ -2363,16 +2436,19 @@
               <span class="metric-label">Download</span>
               <div class="metric-value" data-empty="true"><span id="downloadValue">—</span><span class="unit">Mbps</span></div>
               <p>Measures how fast data is received from the nearest edge node.</p>
+              <canvas class="sparkline-canvas" id="sparklineDownload" aria-hidden="true"></canvas>
             </article>
             <article class="metric">
               <span class="metric-label">Upload</span>
               <div class="metric-value" data-empty="true"><span id="uploadValue">—</span><span class="unit">Mbps</span></div>
               <p>Measures how fast data is sent to the network.</p>
+              <canvas class="sparkline-canvas" id="sparklineUpload" aria-hidden="true"></canvas>
             </article>
             <article class="metric">
               <span class="metric-label">Ping</span>
               <div class="metric-value" data-empty="true"><span id="pingValue">—</span><span class="unit">ms</span></div>
               <p>Lower latency is better for gaming and calls.</p>
+              <canvas class="sparkline-canvas" id="sparklinePing" aria-hidden="true"></canvas>
             </article>
             <article class="metric">
               <span class="metric-label">Jitter</span>
@@ -2397,7 +2473,7 @@
           </div>
 
           <!-- The measurements consumer speed tests leave out. -->
-          <div class="insight-grid" id="insightGrid" hidden>
+          <div class="insight-grid animate-panel" id="insightGrid" hidden>
             <article class="insight">
               <span class="metric-label">Latency distribution</span>
               <p class="insight-note" id="latencyProbes">—</p>

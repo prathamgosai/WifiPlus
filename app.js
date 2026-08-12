@@ -92,6 +92,25 @@ function populateSelect(select, values, selected) {
 }
 
 function currentProviders() {
+  const cards = qsa(".card, .metric");
+  cards.forEach(card => {
+    card.addEventListener("mousemove", (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const midX = rect.width / 2;
+      const midY = rect.height / 2;
+      const tiltX = (y - midY) / 15;
+      const tiltY = (midX - x) / 15;
+      card.style.transform = `perspective(800px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) translateY(-2px)`;
+      card.style.transition = "transform 0.1s ease-out";
+    });
+    card.addEventListener("mouseleave", () => {
+      card.style.transform = "perspective(800px) rotateX(0) rotateY(0) translateY(0)";
+      card.style.transition = "transform 0.5s ease-in-out";
+    });
+  });
+
   if (state.scopedGlobal) return [...providers];
   const country = qs("#countrySelect").value;
   const city = qs("#citySelect").value;
@@ -369,6 +388,31 @@ function updateScores() {
   qs("#analysisTitle").textContent = verdict.title;
   qs("#analysisText").textContent = verdict.detail;
   renderResultSummary(scores);
+  updateAiDoctor();
+}
+
+function updateAiDoctor() {
+  const panel = qs("#aiDoctorPanel");
+  const summaryEl = qs("#aiDoctorSummary");
+  const recsEl = qs("#aiDoctorRecommendations");
+  if (!panel || !summaryEl || !recsEl) return;
+
+  if (state.download === null) {
+    panel.hidden = true;
+    return;
+  }
+
+  const diagnosis = generateAiDiagnosis(state, state.bufferbloat || null);
+  panel.hidden = false;
+  summaryEl.classList.remove("shimmer-placeholder");
+  summaryEl.textContent = diagnosis.summary;
+
+  recsEl.innerHTML = diagnosis.recommendations.map(rec => `
+    <div style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid rgba(0, 242, 255, 0.2); border-radius: 10px; background: rgba(0, 242, 255, 0.05); backdrop-filter: blur(12px);">
+      <span style="color: var(--teal); font-weight: 800; font-size: 1rem; flex-shrink: 0; margin-top: 1px;">✦</span>
+      <span style="font-size: 0.88rem; color: var(--ink); font-weight: 600; line-height: 1.5;">${rec}</span>
+    </div>
+  `).join("");
 }
 
 function renderResultSummary(scores) {
@@ -466,8 +510,10 @@ function paintConnection(net, resolved) {
 
   if (!resolved) {
     qs("#connIsp").textContent = "Detecting…";
+    qs("#connIsp").classList.add("shimmer");
     return;
   }
+  qs("#connIsp").classList.remove("shimmer");
 
   // A failed lookup says so rather than leaving a dash the reader has to
   // interpret. It stops no one from testing — only the labels are unknown.
@@ -592,12 +638,67 @@ function stopGraph() {
 }
 
 // Samples arrive faster than the eye can use; ~25 Hz keeps the arrays small.
-let lastGraphSample = { down: 0, up: 0 };
+let lastGraphSample = { down: 0, up: 0, ping: 0 };
+const sparklineData = { down: [], up: [], ping: [] };
+
+function drawSparkline(id, points, color) {
+  const canvas = qs(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const width = canvas.offsetWidth || 300;
+  const height = canvas.offsetHeight || 36;
+  const dpr = window.devicePixelRatio || 1;
+  if (canvas.width !== width * dpr) {
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  if (points.length < 2) return;
+  
+  const peak = Math.max(...points) || 1;
+  const min = Math.min(...points) || 0;
+  const range = peak === min ? 1 : peak - min;
+  
+  ctx.beginPath();
+  points.forEach((val, i) => {
+    const x = (i / (points.length - 1)) * width;
+    const y = height - 4 - ((val - min) / range) * (height - 8);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+  
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, color);
+  grad.addColorStop(1, "transparent");
+  ctx.lineTo(width, height);
+  ctx.lineTo(0, height);
+  ctx.fillStyle = grad;
+  ctx.globalAlpha = 0.2;
+  ctx.fill();
+  ctx.globalAlpha = 1.0;
+}
+
 function pushGraphSample(kind, mbps) {
   const now = performance.now();
   if (now - lastGraphSample[kind] < 40) return;
   lastGraphSample[kind] = now;
-  graphData[kind].push({ t: now - graphData.startAt, v: mbps });
+  
+  if (kind === 'down' || kind === 'up') {
+    graphData[kind].push({ t: now - graphData.startAt, v: mbps });
+  }
+  
+  sparklineData[kind].push(mbps);
+  
+  if (kind === 'down') drawSparkline("#sparklineDownload", sparklineData.down, token("--blue", "#57a6ff"));
+  if (kind === 'up') drawSparkline("#sparklineUpload", sparklineData.up, token("--teal", "#24d1c3"));
+  if (kind === 'ping') drawSparkline("#sparklinePing", sparklineData.ping, token("--amber", "#f6b64b"));
 }
 
 // ---- Local test history --------------------------------------------------
@@ -698,6 +799,7 @@ function renderLatencyPanel(latency) {
 }
 
 function renderBufferbloat(bloat) {
+  state.bufferbloat = bloat;
   qs("#insightGrid").hidden = false;
   const badge = qs("#bloatGrade");
 
@@ -768,6 +870,7 @@ async function runSpeedTest() {
   status.textContent = "Selecting the nearest measurement edge by latency...";
   qs("#stopTest").hidden = false;
   qs("#resultSummary").hidden = true;
+  qs(".gauge-stage")?.classList.add("active");
   renderGaugeTicks();
   showGauge("running");
   setGaugeFraction(0, "—", "PING", "ms");
@@ -780,7 +883,20 @@ async function runSpeedTest() {
     dns: null,
     stability: null,
     health: null,
+    bufferbloat: null,
   });
+  const aiDoctor = qs("#aiDoctorPanel");
+  if (aiDoctor) aiDoctor.hidden = true;
+  qsa(".animate-panel").forEach(p => p.classList.remove("animate-in"));
+  
+  sparklineData.down = [];
+  sparklineData.up = [];
+  sparklineData.ping = [];
+  qsa(".sparkline-canvas").forEach(c => {
+    const ctx = c.getContext("2d");
+    ctx.clearRect(0, 0, c.width, c.height);
+  });
+
   ["#downloadValue", "#uploadValue", "#pingValue", "#jitterValue", "#lossValue", "#dnsValue", "#stabilityValue"].forEach((id) => setMetric(id, null));
 
   try {
@@ -819,8 +935,10 @@ async function runSpeedTest() {
         },
         // The arc tracks probe progress; the number is the round trip that just
         // came back, so nothing on screen is a placeholder.
-        onLatencyProbe: (done, all, lastRtt) =>
-          setGaugeFraction(done / all, lastRtt === undefined ? "—" : lastRtt.toFixed(0), "PING", "ms"),
+        onLatencyProbe: (done, all, lastRtt) => {
+          setGaugeFraction(done / all, lastRtt === undefined ? "—" : lastRtt.toFixed(0), "PING", "ms");
+          if (lastRtt !== undefined) pushGraphSample("ping", lastRtt);
+        },
         onDownloadSample: (mbps) => {
           setGauge(mbps, "DOWNLOAD");
           pushGraphSample("down", mbps);
@@ -858,6 +976,27 @@ async function runSpeedTest() {
     status.textContent = uploadNote
       ? `Finished, but upload could not be measured: ${uploadNote}. Every other figure is from this run.`
       : `Finished. WiFi health score: ${state.health}/100. Result card, link and sharing are ready.`;
+
+    const aiDoctor = qs("#aiDoctorPanel");
+    if (aiDoctor && state.download !== null) {
+      const diagnosis = generateAiDiagnosis(state, state.bufferbloat);
+      const sum = qs("#aiDoctorSummary");
+      sum.textContent = diagnosis.summary;
+      sum.classList.remove("shimmer-placeholder");
+      qs("#aiDoctorRecommendations").innerHTML = diagnosis.recommendations.map(
+        rec => `<div style="display: flex; gap: 8px; font-size: 0.88rem; color: var(--muted);"><span style="color: var(--teal);">•</span><span>${rec}</span></div>`
+      ).join("");
+      aiDoctor.hidden = false;
+    }
+
+    const panels = qsa(".animate-panel");
+    panels.forEach((p, i) => {
+      p.classList.remove("animate-in");
+      void p.offsetWidth; // trigger reflow
+      p.style.animationDelay = `${i * 100}ms`;
+      p.classList.add("animate-in");
+    });
+    qs(".gauge-stage")?.classList.remove("active");
   } catch (error) {
     if (error instanceof TestAborted) {
       // Blank the tiles. The figures on screen were real, but a download

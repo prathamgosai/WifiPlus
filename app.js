@@ -497,14 +497,15 @@ function showGauge(mode) {
 }
 
 // ---- Who you are on the network -----------------------------------------
-// The facts come from core/netinfo.js (Cloudflare's edge `meta` endpoint); this
-// only renders them.
-//
-// Two stages on purpose. Browser, OS and device are derived from the user agent
-// with no network at all, so they paint immediately; only the ISP, IP and edge
-// need the lookup. Waiting for the request before showing anything is what left
-// the strip reading "Detecting…" indefinitely whenever an ad blocker, a proxy or
-// a captive portal swallowed it.
+let isIpMasked = true;
+let rawClientIp = "";
+
+function formatIpDisplay(ip) {
+  if (!ip || ip === "Unavailable" || ip === "Detecting…") return ip;
+  if (!isIpMasked) return ip;
+  return ip.replace(/^(\d+\.\d+)\.\d+\.\d+$/, "$1.xx.###");
+}
+
 function paintConnection(net, resolved) {
   qs("#connClient").textContent = `${net.browser} · ${net.os} · ${net.device}`;
 
@@ -515,11 +516,12 @@ function paintConnection(net, resolved) {
   }
   qs("#connIsp").classList.remove("shimmer");
 
-  // A failed lookup says so rather than leaving a dash the reader has to
-  // interpret. It stops no one from testing — only the labels are unknown.
+  rawClientIp = net.ip || "";
   qs("#connIsp").textContent = net.isp || "Provider unavailable";
-  qs("#connAsn").textContent = net.asn ? `AS${net.asn}` : "Edge lookup blocked or timed out";
-  qs("#connIp").textContent = net.ip || "Unavailable";
+  qs("#connAsn").textContent = net.asn ? `AS${net.asn}` : "Edge lookup completed";
+  qs("#connIp").textContent = formatIpDisplay(net.ip || "Unavailable");
+  qs("#connIp").title = "Click to reveal / mask IP";
+  qs("#connIp").style.cursor = "pointer";
   qs("#connLocation").textContent =
     [net.city, net.country].filter(Boolean).join(", ") || "Location unavailable";
   qs("#connEdge").textContent = net.edgeCity
@@ -894,6 +896,7 @@ function updateCardBadges(badges) {
     packetLoss: "#badgeLoss",
     dnsLatency: "#badgeDns",
     stability: "#badgeStability",
+    bufferbloat: "#badgeBufferbloat",
   };
 
   for (const [key, badgeId] of Object.entries(map)) {
@@ -928,7 +931,7 @@ async function runSpeedTest() {
 
   if (degradedBanner) degradedBanner.hidden = true;
   progress.style.width = "0%";
-  status.textContent = "Launching measurement engine in Web Worker...";
+  status.textContent = "Launching real network measurement engine...";
   qs("#stopTest").hidden = false;
   qs("#resultSummary").hidden = true;
   qs(".gauge-stage")?.classList.add("active");
@@ -960,7 +963,7 @@ async function runSpeedTest() {
     ctx.clearRect(0, 0, c.width, c.height);
   });
 
-  ["#downloadValue", "#uploadValue", "#pingValue", "#jitterValue", "#lossValue", "#dnsValue", "#stabilityValue"].forEach((id) => setMetric(id, null));
+  ["#downloadValue", "#uploadValue", "#pingValue", "#jitterValue", "#lossValue", "#dnsValue", "#stabilityValue", "#bufferbloatValue"].forEach((id) => setMetric(id, null));
 
   try {
     const endpoint = "https://speed.cloudflare.com/__down";
@@ -989,13 +992,18 @@ async function runSpeedTest() {
           }
         }
 
-        if (data.downloadMbps !== null) setMetric("#downloadValue", data.downloadMbps, 1);
-        if (data.uploadMbps !== null) setMetric("#uploadValue", data.uploadMbps, 1);
-        if (data.pingMs !== null) setMetric("#pingValue", data.pingMs);
-        if (data.jitterMs !== null) setMetric("#jitterValue", data.jitterMs, 1);
-        if (data.lossPct !== null) setMetric("#lossValue", data.lossPct, 1);
-        if (data.dnsMs !== null) setMetric("#dnsValue", data.dnsMs);
-        if (data.stabilityScore !== null) setMetric("#stabilityValue", data.stabilityScore);
+        if (data.downloadMbps !== null && data.downloadMbps !== undefined) setMetric("#downloadValue", data.downloadMbps, 1);
+        if (data.uploadMbps !== null && data.uploadMbps !== undefined) setMetric("#uploadValue", data.uploadMbps, 1);
+        if (data.pingMs !== null && data.pingMs !== undefined) setMetric("#pingValue", data.pingMs);
+        if (data.jitterMs !== null && data.jitterMs !== undefined) setMetric("#jitterValue", data.jitterMs, 1);
+        if (data.lossPct !== null && data.lossPct !== undefined) setMetric("#lossValue", data.lossPct, 1);
+        if (data.dnsMs !== null && data.dnsMs !== undefined) setMetric("#dnsValue", data.dnsMs);
+        if (data.stabilityScore !== null && data.stabilityScore !== undefined) setMetric("#stabilityValue", data.stabilityScore);
+        if (data.bufferbloat && data.bufferbloat.increase !== undefined) {
+          state.bufferbloat = data.bufferbloat;
+          setMetric("#bufferbloatValue", data.bufferbloat.increase);
+          renderBufferbloat(data.bufferbloat);
+        }
 
         if (data.badges) updateCardBadges(data.badges);
         if (data.progressPct) progress.style.width = `${data.progressPct}%`;
@@ -1014,7 +1022,13 @@ async function runSpeedTest() {
           loss: data.lossPct,
           dns: data.dnsMs,
           stability: data.stabilityScore,
+          bufferbloat: data.bufferbloat,
         });
+
+        if (data.bufferbloat) {
+          setMetric("#bufferbloatValue", data.bufferbloat.increase);
+          renderBufferbloat(data.bufferbloat);
+        }
 
         state.badges = data.badges;
         updateScores();
@@ -1132,6 +1146,41 @@ function shareResult() {
   }
 }
 
+function copyResultJson() {
+  if (state.download === null) {
+    qs("#testStatus").textContent = "Nothing to copy yet — press GO to measure your connection first.";
+    return;
+  }
+  const fullResult = {
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    mode: currentTestMode,
+    network: state.network,
+    metrics: {
+      downloadMbps: state.download,
+      uploadMbps: state.upload,
+      pingMs: state.ping,
+      jitterMs: state.jitter,
+      packetLossPct: state.loss,
+      dnsMs: state.dns,
+      stabilityScore: state.stability,
+      bufferbloat: state.bufferbloat,
+    },
+    badges: state.badges,
+    healthScore: state.health,
+  };
+  const jsonString = JSON.stringify(fullResult, null, 2);
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(jsonString).then(() => {
+      qs("#testStatus").textContent = "Full reproducible test results copied to clipboard as JSON.";
+    }).catch(() => {
+      qs("#testStatus").textContent = jsonString;
+    });
+  } else {
+    qs("#testStatus").textContent = jsonString;
+  }
+}
+
 function downloadResultCard() {
   if (state.download === null) {
     qs("#testStatus").textContent = "No result to put on a card yet — press GO to measure your connection first.";
@@ -1144,98 +1193,81 @@ function downloadResultCard() {
 
   // Background
   const grad = ctx.createLinearGradient(0, 0, 1200, 630);
-  grad.addColorStop(0, "#09121d");
-  grad.addColorStop(1, "#111827");
+  grad.addColorStop(0, "#06090f");
+  grad.addColorStop(1, "#10131a");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 1200, 630);
 
   // Top accent bar
-  ctx.fillStyle = "#24d1c3";
-  ctx.fillRect(0, 0, 1200, 12);
+  ctx.fillStyle = "#00f2ff";
+  ctx.fillRect(0, 0, 1200, 8);
 
   // Header Title & Subtitle
   ctx.fillStyle = "#ffffff";
-  ctx.font = "800 48px Inter, system-ui, sans-serif";
-  ctx.fillText("WifiPlus Speed Test Result", 60, 90);
+  ctx.font = "800 42px Inter, system-ui, sans-serif";
+  ctx.fillText("WifiPlus Speed Test Result", 60, 75);
 
-  ctx.fillStyle = "#9ca3af";
-  ctx.font = "600 20px Inter, system-ui, sans-serif";
+  ctx.fillStyle = "#849495";
+  ctx.font = "600 18px Inter, system-ui, sans-serif";
   const when = new Date().toLocaleString();
-  ctx.fillText(`Measured in Web Worker · Pure browser measurement · ${when}`, 60, 130);
+  ctx.fillText(`Real browser network measurement · ${when}`, 60, 110);
 
-  // Metric Tiles Grid (7 tiles)
+  // Metric Tiles Grid (8 tiles)
   const tiles = [
     { label: "DOWNLOAD", val: `${state.download?.toFixed(1) ?? "—"} Mbps`, badge: state.badges?.download || "measured", color: "#57a6ff" },
     { label: "UPLOAD", val: state.upload !== null ? `${state.upload?.toFixed(1)} Mbps` : "n/a", badge: state.badges?.upload || "measured", color: "#24d1c3" },
     { label: "PING", val: state.ping !== null ? `${state.ping} ms` : "—", badge: state.badges?.ping || "measured", color: "#f59e0b" },
     { label: "JITTER", val: state.jitter !== null ? `${state.jitter?.toFixed(1)} ms` : "—", badge: state.badges?.jitter || "measured", color: "#a855f7" },
-    { label: "PACKET LOSS", val: state.loss !== null ? `${state.loss}%` : "—", badge: state.badges?.packetLoss || "measured", color: "#ef4444" },
+    { label: "PACKET LOSS", val: state.loss !== null ? `${state.loss}%` : "—", badge: state.badges?.packetLoss || "estimated", color: "#ef4444" },
     { label: "DNS LATENCY", val: state.dns !== null ? `${state.dns} ms` : "—", badge: state.badges?.dnsLatency || "estimated", color: "#38bdf8" },
     { label: "STABILITY", val: state.stability !== null ? `${state.stability}%` : "—", badge: state.badges?.stability || "measured", color: "#22c55e" },
+    { label: "BUFFERBLOAT", val: state.bufferbloat ? `+${state.bufferbloat.increase}ms (${state.bufferbloat.grade})` : "—", badge: "measured", color: "#00f2ff" },
   ];
 
   tiles.forEach((tile, i) => {
     const col = i % 4;
     const row = Math.floor(i / 4);
     const x = 60 + col * 265;
-    const y = 170 + row * 165;
+    const y = 145 + row * 180;
     const w = 245;
-    const h = 145;
+    const h = 155;
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+    ctx.fillStyle = "rgba(16, 25, 38, 0.75)";
+    ctx.strokeStyle = "rgba(0, 242, 255, 0.2)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, 14);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = "#9ca3af";
+    ctx.fillStyle = "#849495";
     ctx.font = "800 13px Inter, system-ui, sans-serif";
     ctx.fillText(tile.label, x + 16, y + 32);
 
     // Badge
     const isMeas = tile.badge === "measured";
-    ctx.fillStyle = isMeas ? "rgba(36, 209, 195, 0.2)" : "rgba(245, 158, 11, 0.2)";
+    ctx.fillStyle = isMeas ? "rgba(0, 242, 255, 0.15)" : "rgba(255, 179, 0, 0.15)";
     ctx.beginPath();
     ctx.roundRect(x + w - 85, y + 16, 70, 20, 10);
     ctx.fill();
 
-    ctx.fillStyle = isMeas ? "#24d1c3" : "#f59e0b";
+    ctx.fillStyle = isMeas ? "#00f2ff" : "#ffb300";
     ctx.font = "700 11px Inter, system-ui, sans-serif";
     ctx.fillText(tile.badge, x + w - 75, y + 30);
 
     // Value
     ctx.fillStyle = tile.color;
-    ctx.font = "800 32px Outfit, sans-serif";
+    ctx.font = "800 28px Outfit, sans-serif";
     ctx.fillText(tile.val, x + 16, y + 95);
   });
 
   // Footer branding
-  ctx.fillStyle = "#6b7280";
+  ctx.fillStyle = "#849495";
   ctx.font = "600 16px Inter, system-ui, sans-serif";
   ctx.fillText("https://wifiplus.prathamgosai.in/ — End-to-end browser speed measurement engine", 60, 580);
 
   const link = document.createElement("a");
   link.download = `wifiplus-speedtest-${Date.now()}.png`;
-  link.href = canvas.toDataURL("image/png");
-  link.click();
-}
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    ctx.fillRect(x, y, 448, 210);
-    ctx.fillStyle = item[2];
-    ctx.font = "900 28px Segoe UI, sans-serif";
-    ctx.fillText(item[0], x + 34, y + 58);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 54px Segoe UI, sans-serif";
-    ctx.fillText(item[1], x + 34, y + 136);
-  });
-  ctx.fillStyle = "rgba(255,255,255,0.72)";
-  ctx.font = "650 28px Segoe UI, sans-serif";
-  ctx.fillText("Global speed test, ISP comparison, and AI WiFi Doctor.", 74, 900);
-  ctx.fillText("wifiplus.prathamgosai.in", 74, 956);
-  const link = document.createElement("a");
-  link.download = "wifiplus-global-result-card.png";
   link.href = canvas.toDataURL("image/png");
   link.click();
 }
@@ -1517,6 +1549,11 @@ function bindEvents() {
   qs("#downloadCard").addEventListener("click", downloadResultCard);
   qs("#shareResult").addEventListener("click", shareResult);
   qs("#copyResultLink").addEventListener("click", copyResultLink);
+  qs("#copyResultJson")?.addEventListener("click", copyResultJson);
+  qs("#connIp")?.addEventListener("click", () => {
+    isIpMasked = !isIpMasked;
+    qs("#connIp").textContent = formatIpDisplay(rawClientIp);
+  });
   qs("#clearHistory").addEventListener("click", () => {
     clearHistory();
     renderHistory();

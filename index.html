@@ -2515,10 +2515,10 @@
             <article class="metric">
               <div class="metric-header">
                 <span class="metric-label" id="labelLoss">Packet loss</span>
-                <span class="badge measured" id="badgeLoss">measured</span>
+                <span class="badge estimated" id="badgeLoss">estimated</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="lossValue">—</span><span class="unit">%</span></div>
-              <p>Share of latency probes that never came back. A browser cannot observe true packet loss — TCP hides it by resending — so this is the closest proxy available.</p>
+              <p>Share of latency probes that timed out. A browser cannot observe true packet loss — TCP hides it by resending — so timeout rate is the estimated proxy available.</p>
             </article>
             <article class="metric">
               <div class="metric-header">
@@ -2535,6 +2535,14 @@
               </div>
               <div class="metric-value" data-empty="true"><span id="stabilityValue">—</span><span class="unit">%</span></div>
               <p>Combines jitter, packet loss, and variance.</p>
+            </article>
+            <article class="metric">
+              <div class="metric-header">
+                <span class="metric-label">Loaded Latency</span>
+                <span class="badge measured" id="badgeBufferbloat">measured</span>
+              </div>
+              <div class="metric-value" data-empty="true"><span id="bufferbloatValue">—</span><span class="unit">ms</span></div>
+              <p>Latency added under heavy network load (Bufferbloat grade).</p>
             </article>
           </div>
 
@@ -2582,6 +2590,7 @@
               <button class="button secondary" id="downloadCard" type="button">Download Result Card</button>
               <button class="button secondary" id="shareResult" type="button">Share Result</button>
               <button class="button secondary" id="copyResultLink" type="button">Copy Result Link</button>
+              <button class="button secondary" id="copyResultJson" type="button">Copy JSON</button>
             </div>
             <p class="test-note" id="testStatus">Ready. About 11 seconds for download, upload, adaptive latency probing with p95, packet loss, DNS and a bufferbloat grade — real bytes over a global edge network, no ads, no signup, no simulated values.</p>
             <!-- Named because the result means nothing without it: the same link

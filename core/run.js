@@ -147,64 +147,55 @@ export async function runMeasurement(handlers = {}, signal) {
   };
 
   // ---- Idle latency + DNS, together --------------------------------- 0-22%
-  // DNS is independent of the throughput path, so it runs alongside the ping
-  // probes instead of adding its own phase to the wall clock.
+  // ---- Idle latency + DNS, together --------------------------------- 0-22%
   onPhase?.("latency");
-  const [latency, dns] = await Promise.all([
-    runPhase((endpoint) =>
-      measureLatency(
-        (done, all, lastRtt, running) => {
-          onProgress?.((done / all) * PROGRESS.latency);
-          onLatencyProbe?.(done, all, lastRtt);
-          // Streamed as probes land rather than held back until the phase ends.
-          // These are the same running statistics the final result is built
-          // from, so the number being watched is the number that stays.
-          onMetric?.({ ping: running.ping, jitter: running.jitter, loss: running.loss });
-        },
-        signal,
-        endpoint,
-      ),
+  const latencyPromise = runPhase((endpoint) =>
+    measureLatency(
+      (done, all, lastRtt, running) => {
+        onProgress?.((done / all) * PROGRESS.latency);
+        onLatencyProbe?.(done, all, lastRtt);
+        onMetric?.({ ping: running.ping, jitter: running.jitter, loss: running.loss });
+      },
+      signal,
+      endpoint,
     ),
-    measureDns(signal),
-  ]);
+  );
+  const dnsPromise = measureDns(signal).catch(() => null);
+
+  const [latencyRes, dnsRes] = await Promise.allSettled([latencyPromise, dnsPromise]);
+  const latency = latencyRes.status === "fulfilled" ? latencyRes.value : { ping: null, jitter: null, loss: null, min: 0, max: 0, p95: 0, variance: 0, samples: [] };
+  const dns = dnsRes.status === "fulfilled" ? dnsRes.value : null;
+
   onLatencyDetail?.(latency);
   onMetric?.({ ping: latency.ping, jitter: latency.jitter, loss: latency.loss, dns });
 
   // ---- Download + latency under load, together --------------------- 22-62%
-  // The bufferbloat reading is taken DURING the real download rather than in a
-  // separate saturation phase: same measurement, about three seconds less wall
-  // clock, and a more honest load because it is the actual test traffic.
   onPhase?.("download");
-  // Both halves take the SAME endpoint and fail over together — latency under
-  // load is only meaningful against the link the download is saturating.
-  /**
-   * Per-interval download throughput. Kept for the stability score, which is
-   * about how much the rate VARIED — a figure the phase's single mean cannot
-   * carry.
-   *
-   * @type {number[]}
-   */
+  /** @type {number[]} */
   const throughputSamples = [];
 
-  const [down, loadedProbes] = await runPhase((endpoint) =>
-    Promise.all([
-      measureDownload(
-        (mbps, fraction) => {
-          onDownloadSample?.(mbps, fraction);
-          onMetric?.({ download: round1(mbps) });
-          onProgress?.(
-            PROGRESS.latency + clamp01(fraction) * (PROGRESS.download - PROGRESS.latency),
-          );
-        },
-        signal,
-        endpoint,
-        (mbps) => throughputSamples.push(mbps),
-      ),
-      measureLoadedLatency(undefined, signal, endpoint),
-    ]),
+  const downloadPromise = runPhase((endpoint) =>
+    measureDownload(
+      (mbps, fraction) => {
+        onDownloadSample?.(mbps, fraction);
+        onMetric?.({ download: round1(mbps) });
+        onProgress?.(
+          PROGRESS.latency + clamp01(fraction) * (PROGRESS.download - PROGRESS.latency),
+        );
+      },
+      signal,
+      endpoint,
+      (mbps) => throughputSamples.push(mbps),
+    ),
   );
+  const loadedProbesPromise = measureLoadedLatency(undefined, signal, servedBy).catch(() => []);
+
+  const [downRes, loadedProbesRes] = await Promise.allSettled([downloadPromise, loadedProbesPromise]);
+  const down = downRes.status === "fulfilled" ? downRes.value : 0;
+  const loadedProbes = loadedProbesRes.status === "fulfilled" ? loadedProbesRes.value : [];
+
   onMetric?.({ download: round1(down) });
-  const bufferbloat = bufferbloatFrom(latency.ping, loadedProbes);
+  const bufferbloat = bufferbloatFrom(latency.ping || 0, loadedProbes);
   onBufferbloat?.(bufferbloat);
 
   // ---- Upload ------------------------------------------------------ 62-100%

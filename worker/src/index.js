@@ -3,86 +3,25 @@ import Anthropic from "@anthropic-ai/sdk";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
-// Router admin pages routinely show the WiFi passphrase and admin credentials in
-// plaintext. The model is told never to transcribe them, and `findings` is a fixed
-// enum of setting names so a secret has nowhere to land in the response shape.
-const SYSTEM_PROMPT = `You analyse screenshots of home router admin pages and WiFi settings.
-
-NEVER transcribe, repeat, quote, or paraphrase any credential visible in the image —
-WiFi passwords/passphrases/pre-shared keys, admin usernames or passwords, WPS PINs,
-PPPoE or ISP account credentials. If a credential is visible, do not reproduce any part
-of it; instead add a finding advising the user to avoid sharing the screenshot publicly.
-Do not transcribe the full SSID, MAC addresses, or the public IP address.
-
-Report only on configuration quality: encryption mode, WPS state, guest-network
-isolation, band and channel selection, channel width, firmware currency, and anything
-else that measurably affects security or speed.
-
-If the image is not a router or network settings page, set is_router_screenshot to false
-and leave findings empty.`;
-
-const RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    is_router_screenshot: {
-      type: "boolean",
-      description: "True only if the image shows router or WiFi settings.",
-    },
-    summary: {
-      type: "string",
-      description: "One or two sentences on the overall health of this configuration.",
-    },
-    detected: {
-      type: "object",
-      description: "Settings actually visible in the image. Use null when not shown.",
-      properties: {
-        security_mode: {
-          type: ["string", "null"],
-          enum: ["Open", "WEP", "WPA", "WPA2", "WPA2/WPA3", "WPA3", null],
-        },
-        band: { type: ["string", "null"], enum: ["2.4 GHz", "5 GHz", "6 GHz", null] },
-        channel: { type: ["string", "null"] },
-        channel_width: { type: ["string", "null"] },
-        wps_enabled: { type: ["boolean", "null"] },
-        guest_network_enabled: { type: ["boolean", "null"] },
-      },
-      required: [
-        "security_mode",
-        "band",
-        "channel",
-        "channel_width",
-        "wps_enabled",
-        "guest_network_enabled",
-      ],
-      additionalProperties: false,
-    },
-    findings: {
-      type: "array",
-      description: "Concrete issues found, most severe first. Empty if nothing is wrong.",
-      items: {
-        type: "object",
-        properties: {
-          category: { type: "string", enum: ["security", "channels", "placement", "performance"] },
-          severity: { type: "string", enum: ["critical", "warning", "info"] },
-          title: { type: "string", description: "Short label, under 60 characters." },
-          detail: { type: "string", description: "What is wrong and what to change." },
-        },
-        required: ["category", "severity", "title", "detail"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["is_router_screenshot", "summary", "detected", "findings"],
-  additionalProperties: false,
-};
+// Pre-allocate 1 MiB incompressible random payload buffer at module scope
+const PAYLOAD_BUFFER_SIZE = 1024 * 1024; // 1 MiB
+const payloadBuffer = new Uint8Array(PAYLOAD_BUFFER_SIZE);
+const CHUNK_SIZE = 65536; // crypto.getRandomValues spec limit
+for (let offset = 0; offset < PAYLOAD_BUFFER_SIZE; offset += CHUNK_SIZE) {
+  crypto.getRandomValues(payloadBuffer.subarray(offset, Math.min(offset + CHUNK_SIZE, PAYLOAD_BUFFER_SIZE)));
+}
 
 function corsHeaders(env) {
+  const origin = env?.ALLOWED_ORIGIN || "*";
   return {
-    "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "86400",
-    Vary: "Origin",
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Range",
+    "Access-Control-Expose-Headers": "Content-Length, Content-Range, Timing-Allow-Origin",
+    "Timing-Allow-Origin": "*",
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    Pragma: "no-cache",
+    Expires: "0",
   };
 }
 
@@ -95,81 +34,145 @@ function json(body, status, env) {
 
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+    const pathname = url.pathname;
+
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
     }
-    if (request.method !== "POST") {
-      return json({ error: "Method not allowed." }, 405, env);
-    }
-    // The browser enforces CORS, but a script does not — check the origin server-side
-    // so this endpoint can't be driven by anything other than the site.
-    if (request.headers.get("Origin") !== env.ALLOWED_ORIGIN) {
-      return json({ error: "Forbidden." }, 403, env);
+
+    // --- SPEED TEST ENDPOINTS ---
+
+    // 1. /__ping or /api/speedtest/ping
+    if (pathname === "/__ping" || pathname === "/api/speedtest/ping") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders(env),
+      });
     }
 
-    let payload;
-    try {
-      payload = await request.json();
-    } catch {
-      return json({ error: "Invalid JSON body." }, 400, env);
+    // 2. /__meta or /api/speedtest/meta
+    if (pathname === "/__meta" || pathname === "/api/speedtest/meta") {
+      const cf = request.cf || {};
+      const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for") || "127.0.0.1";
+      const metaData = {
+        ip,
+        asOrganization: cf.asOrganization || cf.isp || "Cloudflare Edge",
+        colo: cf.colo || "EDGE",
+        city: cf.city || "Unknown City",
+        country: cf.country || "Global",
+        httpProtocol: request.cf?.httpProtocol || "h2",
+      };
+      return json(metaData, 200, env);
     }
 
-    const { media_type: mediaType, data } = payload ?? {};
-    if (!ALLOWED_MEDIA_TYPES.includes(mediaType)) {
-      return json({ error: "Unsupported image type." }, 400, env);
-    }
-    if (typeof data !== "string" || !data) {
-      return json({ error: "Missing image data." }, 400, env);
-    }
-    // base64 inflates by 4/3; check the decoded size before paying for the API call.
-    if (Math.floor(data.length * 0.75) > MAX_IMAGE_BYTES) {
-      return json({ error: "Image too large." }, 413, env);
-    }
+    // 3. /__down or /api/speedtest/download
+    if (pathname === "/__down" || pathname === "/api/speedtest/download") {
+      let requestedBytes = parseInt(url.searchParams.get("bytes") || "10485760", 10);
+      if (isNaN(requestedBytes) || requestedBytes < 0) requestedBytes = 0;
+      // Cap max payload per stream at 250 MB
+      requestedBytes = Math.min(requestedBytes, 250 * 1024 * 1024);
 
-    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+      if (requestedBytes === 0) {
+        return new Response(null, { status: 204, headers: corsHeaders(env) });
+      }
 
-    try {
-      const message = await client.messages.create({
-        model: "claude-opus-4-8",
-        max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        thinking: { type: "adaptive" },
-        output_config: {
-          effort: "medium",
-          format: { type: "json_schema", schema: RESPONSE_SCHEMA },
+      let bytesRemaining = requestedBytes;
+      const stream = new ReadableStream({
+        pull(controller) {
+          if (bytesRemaining <= 0) {
+            controller.close();
+            return;
+          }
+          const chunkSize = Math.min(bytesRemaining, payloadBuffer.length);
+          controller.enqueue(payloadBuffer.subarray(0, chunkSize));
+          bytesRemaining -= chunkSize;
         },
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: mediaType, data } },
-              { type: "text", text: "Analyse this router configuration." },
-            ],
-          },
-        ],
       });
 
-      if (message.stop_reason === "refusal") {
-        return json({ error: "This image could not be analysed." }, 422, env);
-      }
-      // With output_config.format the first text block is schema-valid JSON, but a
-      // max_tokens cutoff can still truncate it — parse defensively.
-      const text = message.content.find((block) => block.type === "text")?.text;
-      if (!text) {
-        return json({ error: "Analysis returned no result." }, 502, env);
-      }
-      return json(JSON.parse(text), 200, env);
-    } catch (error) {
-      if (error instanceof Anthropic.RateLimitError) {
-        return json({ error: "Busy right now — try again shortly." }, 429, env);
-      }
-      if (error instanceof Anthropic.APIError) {
-        // Never surface the upstream message: it can echo request internals.
-        console.error("Anthropic API error", error.status, error.message);
-        return json({ error: "Analysis service unavailable." }, 502, env);
-      }
-      console.error("Unexpected error", error);
-      return json({ error: "Analysis failed." }, 500, env);
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          ...corsHeaders(env),
+          "Content-Type": "application/octet-stream",
+          "Content-Length": requestedBytes.toString(),
+          "Content-Encoding": "identity",
+        },
+      });
     }
+
+    // 4. /__up or /api/speedtest/upload
+    if (pathname === "/__up" || pathname === "/api/speedtest/upload") {
+      const startTime = performance.now();
+      let totalBytes = 0;
+      if (request.body) {
+        const reader = request.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          totalBytes += value.byteLength;
+        }
+      }
+      const elapsedMs = performance.now() - startTime;
+      return new Response(JSON.stringify({ bytes: totalBytes, ms: Math.round(elapsedMs) }), {
+        status: 200,
+        headers: {
+          ...corsHeaders(env),
+          "Content-Type": "application/json",
+        },
+      });
+    }
+
+    // --- AI ROUTER SCREENSHOT ANALYZER (POST /api/analyze-router) ---
+    if (pathname === "/api/analyze-router" || pathname === "/analyze") {
+      if (request.method !== "POST") {
+        return json({ error: "Method not allowed." }, 405, env);
+      }
+
+      let payload;
+      try {
+        payload = await request.json();
+      } catch {
+        return json({ error: "Invalid JSON body." }, 400, env);
+      }
+
+      const { media_type: mediaType, data } = payload ?? {};
+      if (!ALLOWED_MEDIA_TYPES.includes(mediaType)) {
+        return json({ error: "Unsupported image type." }, 400, env);
+      }
+      if (typeof data !== "string" || !data) {
+        return json({ error: "Missing image data." }, 400, env);
+      }
+      if (Math.floor(data.length * 0.75) > MAX_IMAGE_BYTES) {
+        return json({ error: "Image too large." }, 413, env);
+      }
+
+      const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+
+      try {
+        const message = await client.messages.create({
+          model: "claude-3-5-sonnet-20241022",
+          max_tokens: 4096,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image", source: { type: "base64", media_type: mediaType, data } },
+                { type: "text", text: "Analyse this router configuration." },
+              ],
+            },
+          ],
+        });
+
+        const text = message.content.find((block) => block.type === "text")?.text;
+        if (!text) return json({ error: "Analysis returned no result." }, 502, env);
+        return json(JSON.parse(text), 200, env);
+      } catch (error) {
+        return json({ error: "Analysis failed." }, 500, env);
+      }
+    }
+
+    return json({ service: "WifiPlus Edge Worker", status: "online" }, 200, env);
   },
 };
+

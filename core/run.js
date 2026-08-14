@@ -191,7 +191,8 @@ export async function runMeasurement(handlers = {}, signal) {
   const loadedProbesPromise = measureLoadedLatency(undefined, signal, servedBy).catch(() => []);
 
   const [downRes, loadedProbesRes] = await Promise.allSettled([downloadPromise, loadedProbesPromise]);
-  const down = downRes.status === "fulfilled" ? downRes.value : 0;
+  if (downRes.status === "rejected") throw downRes.reason;
+  const down = downRes.value;
   const loadedProbes = loadedProbesRes.status === "fulfilled" ? loadedProbesRes.value : [];
 
   onMetric?.({ download: round1(down) });

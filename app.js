@@ -929,43 +929,42 @@ async function runSpeedTest() {
   if (testRunning) return;
   testRunning = true;
 
-  if (degradedBanner) degradedBanner.hidden = true;
-  progress.style.width = "0%";
-  status.textContent = "Launching real network measurement engine...";
-  qs("#stopTest").hidden = false;
-  qs("#resultSummary").hidden = true;
-  qs(".gauge-stage")?.classList.add("active");
-  renderGaugeTicks();
-  showGauge("running");
-  setGaugeFraction(0, "—", "PING", "ms");
-
-  Object.assign(state, {
-    download: null,
-    upload: null,
-    ping: null,
-    jitter: null,
-    loss: null,
-    dns: null,
-    stability: null,
-    health: null,
-    bufferbloat: null,
-  });
-
-  const aiDoctor = qs("#aiDoctorPanel");
-  if (aiDoctor) aiDoctor.hidden = true;
-  qsa(".animate-panel").forEach((p) => p.classList.remove("animate-in"));
-
-  sparklineData.down = [];
-  sparklineData.up = [];
-  sparklineData.ping = [];
-  qsa(".sparkline-canvas").forEach((c) => {
-    const ctx = c.getContext("2d");
-    ctx.clearRect(0, 0, c.width, c.height);
-  });
-
-  ["#downloadValue", "#uploadValue", "#pingValue", "#jitterValue", "#lossValue", "#dnsValue", "#stabilityValue", "#bufferbloatValue"].forEach((id) => setMetric(id, null));
-
   try {
+    if (degradedBanner) degradedBanner.hidden = true;
+    if (progress) progress.style.width = "0%";
+    if (status) status.textContent = "Launching real network measurement engine...";
+    if (qs("#stopTest")) qs("#stopTest").hidden = false;
+    if (qs("#resultSummary")) qs("#resultSummary").hidden = true;
+    qs(".gauge-stage")?.classList.add("active");
+    renderGaugeTicks();
+    showGauge("running");
+    setGaugeFraction(0, "—", "PING", "ms");
+
+    Object.assign(state, {
+      download: null,
+      upload: null,
+      ping: null,
+      jitter: null,
+      loss: null,
+      dns: null,
+      stability: null,
+      health: null,
+      bufferbloat: null,
+    });
+
+    const aiDoctor = qs("#aiDoctorPanel");
+    if (aiDoctor) aiDoctor.hidden = true;
+    qsa(".animate-panel").forEach((p) => p.classList.remove("animate-in"));
+
+    sparklineData.down = [];
+    sparklineData.up = [];
+    sparklineData.ping = [];
+    qsa(".sparkline-canvas").forEach((c) => {
+      const ctx = c.getContext("2d");
+      ctx.clearRect(0, 0, c.width, c.height);
+    });
+
+    ["#downloadValue", "#uploadValue", "#pingValue", "#jitterValue", "#lossValue", "#dnsValue", "#stabilityValue", "#bufferbloatValue"].forEach((id) => setMetric(id, null));
     const endpoint = "https://speed.cloudflare.com/__down";
     setEdgeLabel("Cloudflare Edge Node");
 
@@ -973,64 +972,66 @@ async function runSpeedTest() {
     activeWorker = new Worker(new URL("./worker/measure.js", import.meta.url), { type: "module" });
 
     activeWorker.onmessage = (e) => {
-      const { type, data } = e.data ?? {};
-
-      if (type === "snapshot") {
-        if (data.phase) {
-          const copy = PHASE_COPY[data.phase] || `Running ${data.phase}...`;
-          status.textContent = copy;
-
-          if (data.phase === "download" && data.downloadMbps) {
-            setGauge(data.downloadMbps, "DOWNLOAD");
-            pushGraphSample("down", data.downloadMbps);
-          } else if (data.phase === "upload" && data.uploadMbps) {
-            setGauge(data.uploadMbps, "UPLOAD");
-            pushGraphSample("up", data.uploadMbps);
-          } else if (data.phase === "ping" && data.pingMs) {
-            setGaugeFraction(0.5, data.pingMs.toString(), "PING", "ms");
-            pushGraphSample("ping", data.pingMs);
-          }
-        }
-
-        if (data.downloadMbps !== null && data.downloadMbps !== undefined) setMetric("#downloadValue", data.downloadMbps, 1);
-        if (data.uploadMbps !== null && data.uploadMbps !== undefined) setMetric("#uploadValue", data.uploadMbps, 1);
-        if (data.pingMs !== null && data.pingMs !== undefined) setMetric("#pingValue", data.pingMs);
-        if (data.jitterMs !== null && data.jitterMs !== undefined) setMetric("#jitterValue", data.jitterMs, 1);
-        if (data.lossPct !== null && data.lossPct !== undefined) setMetric("#lossValue", data.lossPct, 1);
-        if (data.dnsMs !== null && data.dnsMs !== undefined) setMetric("#dnsValue", data.dnsMs);
-        if (data.stabilityScore !== null && data.stabilityScore !== undefined) setMetric("#stabilityValue", data.stabilityScore);
-        if (data.bufferbloat && data.bufferbloat.increase !== undefined) {
-          state.bufferbloat = data.bufferbloat;
-          setMetric("#bufferbloatValue", data.bufferbloat.increase);
-          renderBufferbloat(data.bufferbloat);
-        }
-
-        if (data.badges) updateCardBadges(data.badges);
-        if (data.progressPct) progress.style.width = `${data.progressPct}%`;
-      } else if (type === "degraded_warning") {
+      const { type, data } = e.data;
+      if (type === "onPhase") {
+        const PHASE_COPY = {
+          select: "Selecting best edge server...",
+          ping: "Measuring ping & jitter...",
+          download: "Measuring download speed...",
+          upload: "Measuring upload speed...",
+        };
+        const copy = PHASE_COPY[data] || `Running ${data}...`;
+        status.textContent = copy;
+      } else if (type === "onProgress") {
+        progress.style.width = `${data}%`;
+      } else if (type === "onMetric") {
+        if (data.ping !== undefined) setMetric("#pingValue", data.ping);
+        if (data.jitter !== undefined) setMetric("#jitterValue", data.jitter, 1);
+        if (data.loss !== undefined) setMetric("#lossValue", data.loss, 1);
+        if (data.dns !== undefined) setMetric("#dnsValue", data.dns);
+        if (data.download !== undefined) setMetric("#downloadValue", data.download, 1);
+        if (data.upload !== undefined) setMetric("#uploadValue", data.upload, 1);
+        if (data.stability !== undefined) setMetric("#stabilityValue", data.stability);
+      } else if (type === "onEdge") {
+        setEdgeLabel(data.label);
+      } else if (type === "onFallback") {
         if (degradedBanner && degradedReason) {
           degradedBanner.hidden = false;
-          degradedReason.textContent = data.degradedReason || "Background tab or CPU starvation detected.";
+          degradedReason.textContent = `Primary edge failed (${data.error}). Falling back to Cloudflare.`;
         }
+      } else if (type === "onLatencyProbe") {
+        if (data.lastRtt !== undefined) {
+          setGaugeFraction(0.5, data.lastRtt.toFixed(0), "PING", "ms");
+          pushGraphSample("ping", data.lastRtt);
+        }
+      } else if (type === "onDownloadSample") {
+        setGauge(data.mbps, "DOWNLOAD");
+        pushGraphSample("down", data.mbps);
+        setMetric("#downloadValue", data.mbps, 1);
+      } else if (type === "onUploadSample") {
+        setGauge(data.mbps, "UPLOAD");
+        pushGraphSample("up", data.mbps);
+        setMetric("#uploadValue", data.mbps, 1);
+      } else if (type === "onLatencyDetail") {
+        const debugPre = qs("#debugLatencyArray");
+        if (debugPre) debugPre.textContent = JSON.stringify(data.samples, null, 2);
+      } else if (type === "onBufferbloat") {
+        setMetric("#bufferbloatValue", data.increase);
+        state.bufferbloat = data;
       } else if (type === "complete") {
+        const outcome = data;
         stopGraph();
         Object.assign(state, {
-          download: data.downloadP90 ?? data.downloadMbps,
-          upload: data.uploadP90 ?? data.uploadMbps,
-          ping: data.pingMs,
-          jitter: data.jitterMs,
-          loss: data.lossPct,
-          dns: data.dnsMs,
-          stability: data.stabilityScore,
-          bufferbloat: data.bufferbloat,
+          download: outcome.result.download,
+          upload: outcome.result.upload,
+          ping: outcome.result.ping,
+          jitter: outcome.result.jitter,
+          loss: outcome.result.loss,
+          dns: outcome.result.dns,
+          stability: outcome.result.stability,
+          bufferbloat: outcome.bufferbloat,
         });
 
-        if (data.bufferbloat) {
-          setMetric("#bufferbloatValue", data.bufferbloat.increase);
-          renderBufferbloat(data.bufferbloat);
-        }
-
-        state.badges = data.badges;
         updateScores();
         setGauge(state.download || 0, "DOWNLOAD");
         showGauge("done");
@@ -1063,22 +1064,31 @@ async function runSpeedTest() {
           }
           aiDoctor.hidden = false;
         }
-
         qs(".gauge-stage")?.classList.remove("active");
         testRunning = false;
         qs("#stopTest").hidden = true;
       } else if (type === "aborted") {
+        progress.style.width = "0%";
         stopGraph();
         showGauge("idle");
-        status.textContent = "Test stopped. Partial measurements discarded.";
+        status.textContent = "Test stopped by user.";
         testRunning = false;
         qs("#stopTest").hidden = true;
+        qs(".gauge-stage")?.classList.remove("active");
       } else if (type === "error") {
+        progress.style.width = "0%";
         stopGraph();
         showGauge("idle");
-        status.textContent = `Test error: ${data?.error || "Unknown worker error"}`;
+        status.textContent = `Test failed: ${data.message}`;
+        const debugErrors = qs("#debugErrorsList");
+        if (debugErrors) {
+          const li = document.createElement("li");
+          li.textContent = data.message;
+          debugErrors.appendChild(li);
+        }
         testRunning = false;
         qs("#stopTest").hidden = true;
+        qs(".gauge-stage")?.classList.remove("active");
       }
     };
 

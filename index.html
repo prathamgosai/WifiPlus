@@ -14,7 +14,7 @@
        as an ordinary network error, so the picker reads it as "server down",
        falls back to Cloudflare and says nothing — the test keeps working and your
        edge is simply never used. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com https://wifiplus-router-analyzer.example.workers.dev; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://speed.cloudflare.com https://cloudflare-dns.com https://edge.wifiplus.prathamgosai.in https://wifiplus-router-analyzer.example.workers.dev; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>WifiPlus — Internet Speed Test, WiFi Analyzer, Ping &amp; Bufferbloat</title>
   <meta name="description" content="Free internet speed test and WiFi analyzer for download, upload, ping, jitter, packet loss, DNS and bufferbloat. Real browser results, no signup.">
@@ -63,7 +63,7 @@
        the modules it pulls in removes the request waterfall that would otherwise
        delay the first paint of the dial by one round trip per module. -->
   <link rel="modulepreload" href="app.js">
-  <link rel="modulepreload" href="core/measure.js">
+  <link rel="modulepreload" href="core/speedtest-engine.js">
   <link rel="modulepreload" href="core/endpoints.js">
   <link rel="modulepreload" href="core/netinfo.js">
   <link rel="modulepreload" href="core/scoring.js">
@@ -2434,11 +2434,6 @@
           </div>
 
           <div class="gauge-stage">
-            <div class="test-mode-toggle" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 14px;">
-              <button type="button" id="modeQuick" style="padding: 6px 16px; border-radius: 20px; font-weight: 800; border: 1px solid var(--teal); background: var(--teal); color: #041113; cursor: pointer;">Quick (~12s)</button>
-              <button type="button" id="modeFull" style="padding: 6px 16px; border-radius: 20px; font-weight: 800; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer;">Full (~30s)</button>
-            </div>
-
             <button class="go-button" id="goButton" type="button" aria-label="Start WiFi speed test">GO</button>
             <p class="go-caption" id="goCaption">Press GO to test your WiFi — about 11 seconds, no signup.</p>
 
@@ -2514,7 +2509,7 @@
             </article>
             <article class="metric">
               <div class="metric-header">
-                <span class="metric-label" id="labelLoss">Packet loss</span>
+                <span class="metric-label" id="labelLoss">App-level Packet Loss</span>
                 <span class="badge estimated" id="badgeLoss">estimated</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="lossValue">—</span><span class="unit">%</span></div>
@@ -3141,6 +3136,9 @@
         <a href="https://prathamgosai.in/" rel="me noopener">prathamgosai.in</a>
       </div>
     </div>
+    <div style="text-align: center; margin-top: 2rem; color: var(--muted); font-size: 0.8rem;">
+      <p><strong>Privacy:</strong> Tests run locally in your browser. Your IP address is used only for edge routing and is never stored, tracked, or sold.</p>
+    </div>
   </footer>
 
   <!-- Offline Banner -->
@@ -3198,12 +3196,21 @@
     </div>
   </div>
 
-  <canvas class="result-card-canvas" id="resultCardCanvas" width="1080" height="1080"></canvas>
+  <details id="diagnosticsPanel" style="display: none; background: rgba(0,0,0,0.8); border: 1px solid red; color: #fff; padding: 1rem; margin: 1rem; border-radius: 8px; z-index: 10000; position: relative;">
+    <summary style="cursor: pointer; font-weight: bold; color: red;">Diagnostics Panel (Engine v3.2.0)</summary>
+    <div style="margin-top: 1rem;">
+      <h4>Raw Latency Points</h4>
+      <pre id="debugLatencyArray" style="max-height: 150px; overflow-y: auto; font-size: 0.8rem; background: #000; padding: 0.5rem;"></pre>
+      <h4>Errors</h4>
+      <ul id="debugErrorsList" style="color: #ff5555; font-size: 0.8rem; list-style-type: square; padding-left: 1.5rem; max-height: 100px; overflow-y: auto;"></ul>
+    </div>
+  </details>
 
+  <canvas class="result-card-canvas" id="resultCardCanvas" width="1080" height="1080"></canvas>
   <!-- Classic script, so it still runs in the one case it exists to report: a
        page opened from file://, where ES modules are blocked outright. Kept out
        of the HTML because CSP forbids inline script. -->
   <script src="boot-check.js"></script>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=4"></script>
 </body>
 </html>

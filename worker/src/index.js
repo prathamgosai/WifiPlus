@@ -17,7 +17,7 @@ function corsHeaders(env) {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Range",
-    "Access-Control-Expose-Headers": "Content-Length, Content-Range, Timing-Allow-Origin",
+    "Access-Control-Expose-Headers": "Content-Length, Content-Range, Timing-Allow-Origin, Server-Timing",
     "Timing-Allow-Origin": "*",
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     Pragma: "no-cache",

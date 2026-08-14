@@ -1,12 +1,11 @@
-const CACHE_NAME = 'wifiplus-v10';
+const CACHE_NAME = 'wifiplus-v14';
 // app.js is an ES module, so the modules it imports are part of the shell: without
 // them a cold offline load would fetch app.js from cache and then fail on its very
 // first import.
 const APP_SHELL = [
   '/',
   '/index.html',
-  '/app.js',
-  '/core/measure.js',
+  '/app.js?v=4',
   '/core/run.js',
   '/core/endpoints.js',
   '/core/server-picker.js',

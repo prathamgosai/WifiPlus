@@ -6,40 +6,19 @@
  * from core/, so a number measured here and a number measured on the home page
  * are the same measurement — there is no "lite" version of the maths.
  */
-import {
-  bufferbloatFrom,
-  measureDns,
-  measureDownload,
-  measureLatency,
-  measureLoadedLatency,
-  measureUpload,
-  stabilityFrom,
-} from "./core/measure.js";
+import { runMeasurement } from "./core/run.js";
 
 const qs = (selector) => document.querySelector(selector);
 
 let running = false;
+let testController = null;
 
-/**
- * Localised strings, published by the generator as data attributes on the tool
- * container. They cannot be an inline script — CSP forbids that — and hardcoding
- * English here would leave every translated page reporting progress in the wrong
- * language halfway through the run.
- *
- * @param {string} name
- * @param {string} fallback
- */
 function t(name, fallback) {
   const tool = qs(".tool");
   const value = tool instanceof HTMLElement ? tool.dataset[name] : undefined;
   return value && value.length ? value : fallback;
 }
 
-/**
- * @param {string} selector
- * @param {number | string | null} value
- * @param {number} [digits]
- */
 function setResult(selector, value, digits = 0) {
   const node = qs(selector);
   if (!node) return;
@@ -48,12 +27,6 @@ function setResult(selector, value, digits = 0) {
   if (unit) node.append(unit);
 }
 
-/**
- * @param {number} fraction 0-1
- * @param {string} readout
- * @param {string} phase
- * @param {string} unit
- */
 function setReadout(fraction, readout, phase, unit) {
   const bar = qs("#bar");
   if (bar instanceof HTMLElement) bar.style.width = `${Math.max(0, Math.min(1, fraction)) * 100}%`;
@@ -71,14 +44,21 @@ function setStatus(message) {
 }
 
 async function run() {
-  if (running) return;
+  if (running) {
+    testController?.abort();
+    return;
+  }
   running = true;
+  testController = new AbortController();
 
   const button = qs("#goButton");
   const caption = qs("#goCaption");
   const readout = qs("#readout");
   const results = qs("#results");
-  if (button instanceof HTMLElement) button.hidden = true;
+  if (button instanceof HTMLElement) {
+    button.textContent = "STOP";
+    button.classList.add("cancel");
+  }
   if (caption instanceof HTMLElement) caption.hidden = true;
   if (readout instanceof HTMLElement) readout.hidden = false;
 
@@ -86,74 +66,69 @@ async function run() {
   setStatus(t("statusLatency", "Measuring ping, jitter, packet loss and DNS…"));
 
   try {
-    // Idle latency and DNS together — DNS is off the throughput path, so it
-    // costs no extra wall-clock here.
-    const [latency, dns] = await Promise.all([
-      measureLatency((done, all, lastRtt) => {
+    const outcome = await runMeasurement({
+      onPhase: (phase) => {
+        if (phase === 'download') setStatus(t("statusDownload", "Measuring download and latency under load…"));
+        else if (phase === 'upload') setStatus(t("statusUpload", "Measuring upload…"));
+      },
+      onProgress: (percent) => {
+        // Handled by specific sample callbacks
+      },
+      onLatencyProbe: (done, all, lastRtt) => {
         setReadout(done / all, lastRtt === undefined ? "—" : lastRtt.toFixed(0), t("phasePing", "PING"), "ms");
-      }),
-      measureDns(),
-    ]);
-
-    setResult("#rPing", latency.ping);
-    setResult("#rJitter", latency.jitter, 1);
-    setResult("#rLoss", latency.loss, 1);
-    setResult("#rDns", dns);
-    if (results instanceof HTMLElement) results.hidden = false;
-
-    // Download and latency-under-load together: the bufferbloat reading is taken
-    // during the real download, so the load is the actual test traffic.
-    setStatus(t("statusDownload", "Measuring download and latency under load…"));
-    const [down, loadedProbes] = await Promise.all([
-      measureDownload((mbps, fraction) =>
-        setReadout(fraction, mbps.toFixed(2), t("phaseDownload", "DOWNLOAD"), "Mbps"),
-      ),
-      measureLoadedLatency(),
-    ]);
-    setResult("#rDownload", Number(down.toFixed(1)), 1);
-
-    // Null when too few probes returned under load — see core/measure.js.
-    const bloat = bufferbloatFrom(latency.ping, loadedProbes);
-    const bloatNode = qs("#rBloat");
-    if (bloatNode) {
-      const unit = bloatNode.querySelector("span");
-      bloatNode.textContent = bloat ? bloat.grade : "?";
-      if (unit) {
-        unit.textContent = bloat ? `+${bloat.increase} ms` : "not measurable";
-        bloatNode.append(unit);
+      },
+      onDownloadSample: (mbps, fraction) => {
+        setReadout(fraction, mbps.toFixed(2), t("phaseDownload", "DOWNLOAD"), "Mbps");
+      },
+      onUploadSample: (mbps, fraction) => {
+        setReadout(fraction, mbps.toFixed(2), t("phaseUpload", "UPLOAD"), "Mbps");
+      },
+      onMetric: (patch) => {
+        if (results instanceof HTMLElement) results.hidden = false;
+        if (patch.ping !== undefined) setResult("#rPing", patch.ping);
+        if (patch.jitter !== undefined) setResult("#rJitter", patch.jitter, 1);
+        if (patch.loss !== undefined) setResult("#rLoss", patch.loss, 1);
+        if (patch.dns !== undefined) setResult("#rDns", patch.dns);
+        if (patch.download !== undefined) setResult("#rDownload", patch.download, 1);
+        if (patch.upload !== undefined) setResult("#rUpload", patch.upload, 1);
+        if (patch.stability !== undefined) setResult("#rStability", patch.stability);
+      },
+      onBufferbloat: (bloat) => {
+        const bloatNode = qs("#rBloat");
+        if (bloatNode) {
+          const unit = bloatNode.querySelector("span");
+          bloatNode.textContent = bloat ? bloat.grade : "?";
+          if (unit) {
+            unit.textContent = bloat ? `+${bloat.increase} ms` : "not measurable";
+            bloatNode.append(unit);
+          }
+        }
+        const verdict = !bloat
+          ? t("verdictUnavailable", "Latency under load could not be measured this run.")
+          : bloat.increase < 30
+            ? t("verdictGood", "Your router keeps queues short.")
+            : bloat.increase < 100
+              ? t("verdictQueueing", "Noticeable queueing under load.")
+              : t("verdictSevere", "Severe bufferbloat under load.");
+        setStatus(verdict);
       }
-    }
+    }, testController.signal);
 
-    setStatus(t("statusUpload", "Measuring upload…"));
-    const up = await measureUpload(
-      (mbps, fraction) => setReadout(fraction, mbps.toFixed(2), t("phaseUpload", "UPLOAD"), "Mbps"),
-      undefined,
-      undefined,
-      // Seed the first chunk from the download just measured.
-      down,
-    );
-    setResult("#rUpload", Number(up.toFixed(1)), 1);
-    setResult("#rStability", stabilityFrom(latency.samples, latency.jitter, latency.loss));
-
-    setReadout(1, down.toFixed(2), t("phaseDownload", "DOWNLOAD"), "Mbps");
-    // Thresholds live in core so every surface grades identically; only the
-    // wording comes from the page, which is what makes it translatable.
-    const verdict = !bloat
-      ? t("verdictUnavailable", "Latency under load could not be measured this run.")
-      : bloat.increase < 30
-        ? t("verdictGood", "Your router keeps queues short.")
-        : bloat.increase < 100
-          ? t("verdictQueueing", "Noticeable queueing under load.")
-          : t("verdictSevere", "Severe bufferbloat under load.");
-    setStatus(verdict);
+    setReadout(1, (outcome.result.download || 0).toFixed(2), t("phaseDownload", "DOWNLOAD"), "Mbps");
   } catch (error) {
-    setStatus(`${t("statusFailed", "Test failed. Check your connection and try again.")} (${error instanceof Error ? error.message : "unknown error"})`);
+    if (error.name === "TestAborted") {
+      setStatus("Test cancelled.");
+    } else {
+      setStatus(`${t("statusFailed", "Test failed. Check your connection and try again.")} (${error.message || "unknown error"})`);
+    }
     if (readout instanceof HTMLElement) readout.hidden = true;
   } finally {
     running = false;
+    testController = null;
     if (button instanceof HTMLElement) {
       button.hidden = false;
       button.textContent = t("labelAgain", "AGAIN");
+      button.classList.remove("cancel");
       button.classList.add("small");
     }
   }

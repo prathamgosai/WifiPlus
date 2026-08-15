@@ -6,9 +6,16 @@
  * DOM layer for that engine: rendering, wiring and page state. Anything that
  * computes a number belongs in core, so the two front ends can never disagree.
  */
-import { TestAborted } from "./core/measure.js";
-import { runMeasurement } from "./core/run.js";
 import { BASE_STOPS, fractionFor, labelFor, needleAngle, pointOnArc } from "./core/gauge.js";
+import {
+  BADGE_TEXT,
+  METRIC_KEYS,
+  MetricState,
+  createMetricStates,
+  isMeasured,
+  settle,
+} from "./core/metric-state.js";
+import { debugEnabled, log, logError } from "./core/test-logger.js";
 import { detectNetwork, localNetInfo } from "./core/netinfo.js";
 import { bufferbloatVerdict, healthVerdict, qualityScores } from "./core/scoring.js";
 import { clearHistory, downloadDelta, loadHistory, saveHistoryEntry } from "./core/history.js";
@@ -516,17 +523,22 @@ function paintConnection(net, resolved) {
   }
   qs("#connIsp").classList.remove("shimmer");
 
+  // Every line here is either an observed fact or the word "Unavailable". The
+  // ASN line used to fall back to "Edge lookup completed" — filler that reads
+  // like a status and states nothing, on a tile whose entire job is to say who
+  // your provider is.
   rawClientIp = net.ip || "";
-  qs("#connIsp").textContent = net.isp || "Provider unavailable";
-  qs("#connAsn").textContent = net.asn ? `AS${net.asn}` : "Edge lookup completed";
-  qs("#connIp").textContent = formatIpDisplay(net.ip || "Unavailable");
-  qs("#connIp").title = "Click to reveal / mask IP";
-  qs("#connIp").style.cursor = "pointer";
-  qs("#connLocation").textContent =
-    [net.city, net.country].filter(Boolean).join(", ") || "Location unavailable";
+  qs("#connIsp").textContent = net.isp || "Unavailable";
+  qs("#connAsn").textContent = net.asn ? `AS${net.asn}` : "";
+  qs("#connIp").textContent = net.ip ? formatIpDisplay(net.ip) : "Unavailable";
+  if (net.ip) {
+    qs("#connIp").title = "Click to reveal / mask IP";
+    qs("#connIp").style.cursor = "pointer";
+  }
+  qs("#connLocation").textContent = [net.city, net.country].filter(Boolean).join(", ");
   qs("#connEdge").textContent = net.edgeCity
     ? `${net.edgeCity} (${net.colo})`
-    : net.colo || "Nearest edge";
+    : net.colo || "Unavailable";
   qs("#connProtocol").textContent = net.httpProtocol ? `over ${net.httpProtocol}` : "";
 }
 
@@ -753,16 +765,19 @@ function applyResultFromHash() {
     download: shared.download, upload: shared.upload, ping: shared.ping,
     jitter: shared.jitter, loss: shared.loss, dns: shared.dns, stability: shared.stability,
   });
-  setMetric("#downloadValue", state.download, 1);
-  setMetric("#uploadValue", state.upload, 1);
-  setMetric("#pingValue", state.ping);
-  setMetric("#jitterValue", state.jitter, 1);
-  setMetric("#lossValue", state.loss, 1);
-  setMetric("#dnsValue", state.dns);
-  setMetric("#stabilityValue", state.stability);
+  // A shared link carries someone else's readings. They are real measurements,
+  // so they settle their badges the same way a local run does — a field the
+  // link did not carry stays unavailable rather than borrowing a claim.
+  publishMetric("download", state.download);
+  publishMetric("upload", state.upload);
+  publishMetric("ping", state.ping);
+  publishMetric("jitter", state.jitter);
+  publishMetric("loss", state.loss);
+  publishMetric("dns", state.dns);
+  publishMetric("stability", state.stability);
   updateScores();
   renderGaugeTicks();
-  setGauge(state.download || 0, "DOWNLOAD");
+  setGauge(isMeasured(state.download) ? state.download : 0, "DOWNLOAD");
   showGauge("done");
 
   const who = [shared.isp, shared.edgeCity].filter(Boolean).join(" · ");
@@ -857,54 +872,123 @@ function setEdgeLabel(label) {
 
 // The GO dial is the only way to start a run, so the guard lives here rather
 // than on a button's disabled state.
-let currentTestMode = "quick";
+//
+// There is deliberately no quick/full mode switch. One existed in code — it set
+// a `currentTestMode` flag that was posted to the worker, printed in the
+// finished-status line and stamped into the exported JSON — but the buttons it
+// listened for (#modeQuick, #modeFull) are not in the markup, and the engine
+// never read the flag. Every run was the same run while the UI and the exported
+// result both claimed a mode had been chosen. A label describing a setting that
+// does not exist is worse than no setting, so the flag is gone; if the modes
+// come back, they belong in `core/run.js` where the measurement windows live.
 let activeWorker = null;
 
-function setupTestModeToggle() {
-  const modeQuick = qs("#modeQuick");
-  const modeFull = qs("#modeFull");
-  if (!modeQuick || !modeFull) return;
+// ---- Metric card state ---------------------------------------------------
+// Each card's badge is DERIVED from this map, never written by hand. The badges
+// used to be hardcoded in index.html, so every card shipped claiming "measured"
+// and kept claiming it while its value was an em dash and the run had already
+// failed. The rule now: the word "measured" appears only where `isMeasured()`
+// says a finite number exists behind it.
 
-  modeQuick.addEventListener("click", () => {
-    currentTestMode = "quick";
-    modeQuick.style.background = "var(--teal)";
-    modeQuick.style.color = "#041113";
-    modeQuick.style.borderColor = "var(--teal)";
-    modeFull.style.background = "transparent";
-    modeFull.style.color = "var(--ink)";
-    modeFull.style.borderColor = "var(--line)";
-  });
+/** Which badge element belongs to which metric. */
+const BADGE_IDS = {
+  download: "#badgeDownload",
+  upload: "#badgeUpload",
+  ping: "#badgePing",
+  jitter: "#badgeJitter",
+  loss: "#badgeLoss",
+  dns: "#badgeDns",
+  stability: "#badgeStability",
+  bufferbloat: "#badgeBufferbloat",
+};
 
-  modeFull.addEventListener("click", () => {
-    currentTestMode = "full";
-    modeFull.style.background = "var(--teal)";
-    modeFull.style.color = "#041113";
-    modeFull.style.borderColor = "var(--teal)";
-    modeQuick.style.background = "transparent";
-    modeQuick.style.color = "var(--ink)";
-    modeQuick.style.borderColor = "var(--line)";
-  });
+/** Which value element belongs to which metric, and at what precision. */
+const VALUE_IDS = {
+  download: ["#downloadValue", 1],
+  upload: ["#uploadValue", 1],
+  ping: ["#pingValue", 0],
+  jitter: ["#jitterValue", 1],
+  loss: ["#lossValue", 1],
+  dns: ["#dnsValue", 0],
+  stability: ["#stabilityValue", 0],
+  bufferbloat: ["#bufferbloatValue", 0],
+};
+
+/** @type {Record<string, string>} */
+let metricStates = createMetricStates();
+
+/**
+ * Paint one badge from its state.
+ *
+ * @param {string} key
+ */
+function paintBadge(key) {
+  const el = qs(BADGE_IDS[key]);
+  if (!el) return;
+  const badgeState = metricStates[key] ?? MetricState.NOT_STARTED;
+  el.textContent = BADGE_TEXT[badgeState];
+  el.className = `badge ${badgeState}`;
 }
 
-function updateCardBadges(badges) {
-  if (!badges) return;
-  const map = {
-    download: "#badgeDownload",
-    upload: "#badgeUpload",
-    ping: "#badgePing",
-    jitter: "#badgeJitter",
-    packetLoss: "#badgeLoss",
-    dnsLatency: "#badgeDns",
-    stability: "#badgeStability",
-    bufferbloat: "#badgeBufferbloat",
-  };
+/**
+ * Move one or more metrics into a state and repaint their badges.
+ *
+ * @param {string[]} keys
+ * @param {string} next
+ */
+function setMetricState(keys, next) {
+  for (const key of keys) {
+    if (!(key in metricStates)) continue;
+    metricStates[key] = next;
+    paintBadge(key);
+  }
+}
 
-  for (const [key, badgeId] of Object.entries(map)) {
-    const el = qs(badgeId);
-    if (!el) continue;
-    const badgeType = badges[key] || "measured";
-    el.textContent = badgeType;
-    el.className = `badge ${badgeType}`;
+/**
+ * Publish a measured value, or refuse to.
+ *
+ * This is the single gate between the engine and the grid. A value that is
+ * null, NaN, Infinity or negative never reaches the DOM as a number: the tile
+ * keeps its em dash and the badge says why. Without this gate a divide-by-zero
+ * in a throughput window renders as "NaN Mbps", which looks like a measurement
+ * and is not one.
+ *
+ * @param {string} key
+ * @param {unknown} value
+ * @param {string} [whenMissing] state to use when the value is not publishable
+ */
+function publishMetric(key, value, whenMissing = MetricState.UNAVAILABLE) {
+  const entry = VALUE_IDS[key];
+  if (!entry) return;
+  const [selector, digits] = entry;
+  const ok = isMeasured(value);
+  setMetric(selector, ok ? Number(value) : null, digits);
+  setMetricState([key], settle(value, whenMissing));
+}
+
+/**
+ * Live value during a phase: shows the number without settling the badge, which
+ * stays on "measuring" until the phase actually ends. An in-flight reading is a
+ * real measurement of this instant, but it is not the run's answer yet.
+ *
+ * @param {string} key
+ * @param {unknown} value
+ */
+function publishLiveMetric(key, value) {
+  const entry = VALUE_IDS[key];
+  if (!entry || !isMeasured(value)) return;
+  const [selector, digits] = entry;
+  setMetric(selector, Number(value), digits);
+  if (metricStates[key] === MetricState.NOT_STARTED) setMetricState([key], MetricState.TESTING);
+}
+
+/** Blank every tile and reset every badge — used at load and on every re-run. */
+function resetMetricCards() {
+  metricStates = createMetricStates();
+  for (const key of METRIC_KEYS) {
+    const [selector, digits] = VALUE_IDS[key];
+    setMetric(selector, null, digits);
+    paintBadge(key);
   }
 }
 
@@ -964,60 +1048,78 @@ async function runSpeedTest() {
       ctx.clearRect(0, 0, c.width, c.height);
     });
 
-    ["#downloadValue", "#uploadValue", "#pingValue", "#jitterValue", "#lossValue", "#dnsValue", "#stabilityValue", "#bufferbloatValue"].forEach((id) => setMetric(id, null));
-    const endpoint = "https://speed.cloudflare.com/__down";
-    setEdgeLabel("Cloudflare Edge Node");
+    resetMetricCards();
 
-    // Launch Web Worker measurement
-    activeWorker = new Worker(new URL("./worker/measure.js", import.meta.url), { type: "module" });
+    // Launch Web Worker measurement.
+    //
+    // The debug flag is carried on the worker's own URL. A Worker has no
+    // localStorage and does not inherit the page's query string, so
+    // `debugEnabled()` was always false inside it — which meant the debug mode
+    // logged the finished result and none of the transfers that produced it,
+    // exactly the detail it exists to show.
+    const workerUrl = new URL("./worker/measure.js", import.meta.url);
+    if (debugEnabled()) workerUrl.searchParams.set("debug", "1");
+    activeWorker = new Worker(workerUrl, { type: "module" });
+
+    // A worker that fails to parse or import never sends a message, so without
+    // this the page would sit on "Launching…" forever with no explanation.
+    activeWorker.onerror = (event) => {
+      logError("worker failed to start", event.message || "unknown");
+      failRun(`The measurement engine could not start (${event.message || "worker error"}).`);
+    };
 
     activeWorker.onmessage = (e) => {
       const { type, data } = e.data;
       if (type === "onPhase") {
-        const PHASE_COPY = {
-          select: "Selecting best edge server...",
-          ping: "Measuring ping & jitter...",
-          download: "Measuring download speed...",
-          upload: "Measuring upload speed...",
-        };
-        const copy = PHASE_COPY[data] || `Running ${data}...`;
-        status.textContent = copy;
+        status.textContent = PHASE_COPY[data] || `Running ${data}...`;
+        // Entering a phase puts its metrics on "measuring", which is what makes
+        // the badge tell the truth mid-run instead of pre-claiming a result.
+        if (data === "latency") setMetricState(["ping", "jitter", "loss", "dns"], MetricState.TESTING);
+        if (data === "download") setMetricState(["download", "bufferbloat"], MetricState.TESTING);
+        if (data === "upload") setMetricState(["upload", "stability"], MetricState.TESTING);
       } else if (type === "onProgress") {
-        progress.style.width = `${data}%`;
+        progress.style.width = `${clamp(data, 0, 100)}%`;
       } else if (type === "onMetric") {
-        if (data.ping !== undefined) setMetric("#pingValue", data.ping);
-        if (data.jitter !== undefined) setMetric("#jitterValue", data.jitter, 1);
-        if (data.loss !== undefined) setMetric("#lossValue", data.loss, 1);
-        if (data.dns !== undefined) setMetric("#dnsValue", data.dns);
-        if (data.download !== undefined) setMetric("#downloadValue", data.download, 1);
-        if (data.upload !== undefined) setMetric("#uploadValue", data.upload, 1);
-        if (data.stability !== undefined) setMetric("#stabilityValue", data.stability);
+        // Running values during a phase: shown live, badge stays "measuring".
+        for (const key of ["ping", "jitter", "loss", "dns", "download", "upload", "stability"]) {
+          if (data[key] !== undefined) publishLiveMetric(key, data[key]);
+        }
       } else if (type === "onEdge") {
         setEdgeLabel(data.label);
       } else if (type === "onFallback") {
         if (degradedBanner && degradedReason) {
           degradedBanner.hidden = false;
-          degradedReason.textContent = `Primary edge failed (${data.error}). Falling back to Cloudflare.`;
+          degradedReason.textContent = `${data.name || "Primary edge"} failed (${data.error}). Measuring against the next edge instead.`;
         }
       } else if (type === "onLatencyProbe") {
-        if (data.lastRtt !== undefined) {
+        if (data.lastRtt !== null && Number.isFinite(data.lastRtt)) {
           setGaugeFraction(0.5, data.lastRtt.toFixed(0), "PING", "ms");
           pushGraphSample("ping", data.lastRtt);
         }
       } else if (type === "onDownloadSample") {
         setGauge(data.mbps, "DOWNLOAD");
         pushGraphSample("down", data.mbps);
-        setMetric("#downloadValue", data.mbps, 1);
+        publishLiveMetric("download", data.mbps);
       } else if (type === "onUploadSample") {
         setGauge(data.mbps, "UPLOAD");
         pushGraphSample("up", data.mbps);
-        setMetric("#uploadValue", data.mbps, 1);
+        publishLiveMetric("upload", data.mbps);
       } else if (type === "onLatencyDetail") {
+        // The latency phase is over, so its three metrics settle now rather
+        // than waiting for the whole run: they are finished readings, and a
+        // badge that still says "measuring" through the download is stale.
+        renderLatencyPanel(data);
+        publishMetric("ping", data.ping);
+        publishMetric("jitter", data.jitter);
+        publishMetric("loss", data.loss);
         const debugPre = qs("#debugLatencyArray");
         if (debugPre) debugPre.textContent = JSON.stringify(data.samples, null, 2);
       } else if (type === "onBufferbloat") {
-        setMetric("#bufferbloatValue", data.increase);
-        state.bufferbloat = data;
+        // Null when too few probes survived the saturated link to grade it.
+        // Reading `.increase` off that null used to throw inside this handler
+        // and kill the rest of the run silently.
+        renderBufferbloat(data);
+        publishMetric("bufferbloat", data ? data.increase : null);
       } else if (type === "complete") {
         const outcome = data;
         stopGraph();
@@ -1032,8 +1134,21 @@ async function runSpeedTest() {
           bufferbloat: outcome.bufferbloat,
         });
 
+        // Settle every badge against the value that actually came back. Upload
+        // is the one metric a run is allowed to finish without, and the outcome
+        // carries the reason — so it settles to "failed" with an explanation
+        // rather than silently to "unavailable".
+        publishMetric("download", state.download, MetricState.ERROR);
+        publishMetric("upload", state.upload, outcome.uploadNote ? MetricState.ERROR : MetricState.UNAVAILABLE);
+        publishMetric("ping", state.ping);
+        publishMetric("jitter", state.jitter);
+        publishMetric("loss", state.loss);
+        publishMetric("dns", state.dns);
+        publishMetric("stability", state.stability);
+        publishMetric("bufferbloat", state.bufferbloat ? state.bufferbloat.increase : null);
+
         updateScores();
-        setGauge(state.download || 0, "DOWNLOAD");
+        setGauge(isMeasured(state.download) ? state.download : 0, "DOWNLOAD");
         showGauge("done");
 
         saveHistoryEntry({
@@ -1046,7 +1161,12 @@ async function runSpeedTest() {
         });
         renderHistory();
 
-        status.textContent = `Finished (${currentTestMode} mode). WiFi health score: ${state.health}/100. Result card, link and sharing ready.`;
+        log("complete", outcome.result);
+        // The note names the one metric that could not be produced, so the
+        // finished state does not read as a clean sweep when it was not.
+        status.textContent = outcome.uploadNote
+          ? `Finished, but the upload could not be measured (${outcome.uploadNote}). Everything else on screen is a real reading. WiFi health score: ${state.health}/100.`
+          : `Finished. WiFi health score: ${state.health}/100. Result card, link and sharing ready.`;
 
         const aiDoctor = qs("#aiDoctorPanel");
         if (aiDoctor && state.download !== null) {
@@ -1068,54 +1188,154 @@ async function runSpeedTest() {
         testRunning = false;
         qs("#stopTest").hidden = true;
       } else if (type === "aborted") {
-        progress.style.width = "0%";
-        stopGraph();
-        showGauge("idle");
-        status.textContent = "Test stopped by user.";
-        testRunning = false;
-        qs("#stopTest").hidden = true;
-        qs(".gauge-stage")?.classList.remove("active");
+        endRun();
+        // Cancellation invalidates every partial reading on screen. Leaving a
+        // half-measured download visible would present the first two seconds of
+        // a transfer as the connection's speed.
+        resetMetricCards();
+        status.textContent = "Test cancelled. No result was recorded — press GO to run a fresh measurement.";
       } else if (type === "error") {
-        progress.style.width = "0%";
-        stopGraph();
-        showGauge("idle");
-        status.textContent = `Test failed: ${data.message}`;
+        endRun();
+        logError("run failed", data.message);
+        // Whatever phase was in flight has no honest value. Anything already
+        // settled to MEASURED keeps its badge, because those readings did land.
+        for (const key of METRIC_KEYS) {
+          if (metricStates[key] === MetricState.TESTING) setMetricState([key], MetricState.ERROR);
+        }
+        status.textContent = describeFailure(data.message);
         const debugErrors = qs("#debugErrorsList");
         if (debugErrors) {
           const li = document.createElement("li");
           li.textContent = data.message;
           debugErrors.appendChild(li);
         }
-        testRunning = false;
-        qs("#stopTest").hidden = true;
-        qs(".gauge-stage")?.classList.remove("active");
       }
     };
 
-    activeWorker.postMessage({
-      type: "start",
-      data: { endpoint, mode: currentTestMode },
-    });
+    activeWorker.postMessage({ type: "start" });
   } catch (error) {
-    progress.style.width = "0%";
-    stopGraph();
-    showGauge("idle");
-    status.textContent = `Test failed: ${error.message}.`;
-    testRunning = false;
-    qs("#stopTest").hidden = true;
+    logError("could not start run", error);
+    failRun(`The measurement engine could not start (${error.message}).`);
   }
 }
 
-function stopSpeedTest() {
+/**
+ * Tear down the running-test UI. Every terminal path goes through here, so
+ * "stop the spinner" cannot be implemented four times and forgotten in one.
+ *
+ * @param {{ release?: boolean }} [options] `release: false` leaves the worker
+ *   alive on purpose — a cancel needs it to survive long enough to abort its own
+ *   fetches, and killing it here is exactly the race this code had.
+ */
+function endRun({ release = true } = {}) {
+  // Releasing here rather than at each call site is what guarantees no run —
+  // finished, failed or cancelled — leaves a thread alive holding open sockets.
+  if (release) releaseWorker();
+  stopGraph();
+  const progress = qs("#testProgress");
+  if (progress) progress.style.width = "0%";
+  showGauge("idle");
+  qs("#stopTest").hidden = true;
+  qs(".gauge-stage")?.classList.remove("active");
+  testRunning = false;
+}
+
+/**
+ * Terminal failure before or outside the worker's own error message.
+ *
+ * @param {string} message
+ */
+function failRun(message) {
   if (activeWorker) {
-    activeWorker.postMessage({ type: "stop" });
     activeWorker.terminate();
     activeWorker = null;
   }
-  testRunning = false;
-  qs("#stopTest").hidden = true;
-  showGauge("idle");
-  qs("#testStatus").textContent = "Test stopped by user.";
+  endRun();
+  resetMetricCards();
+  qs("#testStatus").textContent = message;
+}
+
+/**
+ * Turn an engine error into something that says what to do about it. A raw
+ * "Failed to fetch" tells the user nothing; whether they are offline, blocked,
+ * or looking at a dead edge changes the answer entirely.
+ *
+ * @param {string} message
+ * @returns {string}
+ */
+function describeFailure(message) {
+  const raw = String(message || "");
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "Test failed: this device is offline. Reconnect and press GO again.";
+  }
+  if (/no latency samples/i.test(raw)) {
+    return "Test failed: no latency probe reached the measurement edge. A VPN, firewall or ad blocker may be blocking speed.cloudflare.com.";
+  }
+  if (/failed to fetch|networkerror|load failed/i.test(raw)) {
+    return "Test failed: the measurement server stopped responding. This is usually a dropped connection, a blocked request, or an edge that is temporarily down.";
+  }
+  if (/abort|timeout|timed out/i.test(raw)) {
+    return "Test failed: the measurement timed out before enough data moved to produce a result.";
+  }
+  return `Test failed: ${raw}`;
+}
+
+/**
+ * How long to let the worker wind itself down before killing it outright.
+ *
+ * A cancelled run has to stop MOVING BYTES, not merely stop drawing. The worker
+ * needs one turn of its message loop to receive `stop` and fire the engine's
+ * AbortController, which is what actually aborts the open streams.
+ */
+const CANCEL_GRACE_MS = 1500;
+
+/** Kill timer for a cancel that the worker never acknowledged. */
+let cancelTimer = null;
+
+/**
+ * CANCEL. Aborts the in-flight transfers, tears the worker down, and returns
+ * the page to idle without recording a result.
+ *
+ * The order matters, and getting it wrong is invisible on screen. Posting `stop`
+ * and calling `terminate()` back to back — as this did — destroys the worker
+ * before its message loop can run the handler, so the AbortController never
+ * fires and the browser keeps eight 25 MB downloads streaming to a dead thread.
+ * The UI said "cancelled" while the connection stayed saturated; measured with
+ * Playwright, six requests were still in flight three seconds after the click.
+ *
+ * So: post `stop`, let the worker abort its own fetches and answer with
+ * `aborted`, and terminate on that acknowledgement. `CANCEL_GRACE_MS` is the
+ * backstop for a worker too wedged to answer at all.
+ */
+function stopSpeedTest() {
+  if (!activeWorker) return;
+  activeWorker.postMessage({ type: "stop" });
+
+  window.clearTimeout(cancelTimer);
+  cancelTimer = window.setTimeout(() => {
+    if (activeWorker) {
+      logError("cancel", "worker did not acknowledge — terminating");
+      activeWorker.terminate();
+      activeWorker = null;
+    }
+  }, CANCEL_GRACE_MS);
+
+  // The UI goes idle immediately: the click is the user's decision and must not
+  // appear to hang while the streams unwind. The worker stays alive until it
+  // acknowledges, or until the grace timer above kills it.
+  endRun({ release: false });
+  resetMetricCards();
+  qs("#testStatus").textContent = "Test cancelled. No result was recorded — press GO to run a fresh measurement.";
+}
+
+/** Release the worker once it has finished with it. */
+function releaseWorker() {
+  window.clearTimeout(cancelTimer);
+  cancelTimer = null;
+  if (activeWorker) {
+    activeWorker.terminate();
+    activeWorker = null;
+  }
 }
 
 function updateBandwidth() {
@@ -1164,7 +1384,6 @@ function copyResultJson() {
   const fullResult = {
     timestamp: new Date().toISOString(),
     userAgent: navigator.userAgent,
-    mode: currentTestMode,
     network: state.network,
     metrics: {
       downloadMbps: state.download,
@@ -1176,7 +1395,10 @@ function copyResultJson() {
       stabilityScore: state.stability,
       bufferbloat: state.bufferbloat,
     },
-    badges: state.badges,
+    // Exported so a shared result carries its own provenance: a reader can see
+    // which figures were measured and which were unavailable, instead of having
+    // to infer it from a null.
+    metricStates: { ...metricStates },
     healthScore: state.health,
   };
   const jsonString = JSON.stringify(fullResult, null, 2);
@@ -1222,16 +1444,34 @@ function downloadResultCard() {
   const when = new Date().toLocaleString();
   ctx.fillText(`Real browser network measurement · ${when}`, 60, 110);
 
-  // Metric Tiles Grid (8 tiles)
+  // Metric Tiles Grid (8 tiles).
+  //
+  // Badges come from the live state map, not from a literal. These fell back to
+  // a hardcoded "measured" against `state.badges`, an object nothing ever
+  // assigned — so an exported card stamped "measured" on an em dash, and the
+  // card is the artefact most likely to be shared with someone who never saw
+  // the run.
+  const tile = (label, key, format, color) => ({
+    label,
+    val: isMeasured(state[key]) ? format(state[key]) : "—",
+    badge: BADGE_TEXT[metricStates[key]] ?? BADGE_TEXT[MetricState.NOT_STARTED],
+    color,
+  });
+
   const tiles = [
-    { label: "DOWNLOAD", val: `${state.download?.toFixed(1) ?? "—"} Mbps`, badge: state.badges?.download || "measured", color: "#57a6ff" },
-    { label: "UPLOAD", val: state.upload !== null ? `${state.upload?.toFixed(1)} Mbps` : "n/a", badge: state.badges?.upload || "measured", color: "#24d1c3" },
-    { label: "PING", val: state.ping !== null ? `${state.ping} ms` : "—", badge: state.badges?.ping || "measured", color: "#f59e0b" },
-    { label: "JITTER", val: state.jitter !== null ? `${state.jitter?.toFixed(1)} ms` : "—", badge: state.badges?.jitter || "measured", color: "#a855f7" },
-    { label: "PACKET LOSS", val: state.loss !== null ? `${state.loss}%` : "—", badge: state.badges?.packetLoss || "estimated", color: "#ef4444" },
-    { label: "DNS LATENCY", val: state.dns !== null ? `${state.dns} ms` : "—", badge: state.badges?.dnsLatency || "estimated", color: "#38bdf8" },
-    { label: "STABILITY", val: state.stability !== null ? `${state.stability}%` : "—", badge: state.badges?.stability || "measured", color: "#22c55e" },
-    { label: "BUFFERBLOAT", val: state.bufferbloat ? `+${state.bufferbloat.increase}ms (${state.bufferbloat.grade})` : "—", badge: "measured", color: "#00f2ff" },
+    tile("DOWNLOAD", "download", (v) => `${v.toFixed(1)} Mbps`, "#57a6ff"),
+    tile("UPLOAD", "upload", (v) => `${v.toFixed(1)} Mbps`, "#24d1c3"),
+    tile("PING", "ping", (v) => `${v} ms`, "#f59e0b"),
+    tile("JITTER", "jitter", (v) => `${v.toFixed(1)} ms`, "#a855f7"),
+    tile("PACKET LOSS", "loss", (v) => `${v}%`, "#ef4444"),
+    tile("DNS LATENCY", "dns", (v) => `${v} ms`, "#38bdf8"),
+    tile("STABILITY", "stability", (v) => `${v}%`, "#22c55e"),
+    {
+      label: "LOADED LATENCY",
+      val: state.bufferbloat ? `+${state.bufferbloat.increase}ms (${state.bufferbloat.grade})` : "—",
+      badge: BADGE_TEXT[metricStates.bufferbloat] ?? BADGE_TEXT[MetricState.NOT_STARTED],
+      color: "#00f2ff",
+    },
   ];
 
   tiles.forEach((tile, i) => {
@@ -1548,9 +1788,21 @@ function bindEvents() {
   ["#devices", "#streams", "#gamers", "#workers"].forEach((selector) => qs(selector).addEventListener("input", updateBandwidth));
   qs("#gameSelect").addEventListener("change", updatePingCalculator);
   qs("#pingInput").addEventListener("input", updatePingCalculator);
-  setupTestModeToggle();
+  // Badges reflect "not tested" from the moment the page paints, rather than
+  // inheriting whatever the markup shipped with.
+  resetMetricCards();
   qs("#goButton").addEventListener("click", runSpeedTest);
   qs("#stopTest").addEventListener("click", stopSpeedTest);
+  // Connection loss during a run invalidates the numbers still in flight, so
+  // say so rather than letting a stalled transfer read as a slow link.
+  window.addEventListener("offline", () => {
+    if (testRunning) {
+      logError("network", "went offline mid-run");
+      stopSpeedTest();
+      qs("#testStatus").textContent =
+        "Test cancelled: this device went offline mid-measurement, so the partial readings were discarded.";
+    }
+  });
   qs("#heroStart").addEventListener("click", (event) => {
     event.preventDefault();
     qs("#speed-test").scrollIntoView({ behavior: "smooth" });

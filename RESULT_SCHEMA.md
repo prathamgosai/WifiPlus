@@ -2,6 +2,8 @@
 
 This document defines the JSON structure of an exported WifiPlus speed test result. Every number presented in the UI traces directly to a logged sample array in this schema, allowing independent auditing of test results.
 
+> **Status: target schema, not yet the shipped export.** The "Copy JSON" button currently emits a flatter object — `timestamp`, `userAgent`, `network`, a single-value `metrics` block, `metricStates` and `healthScore`. The fields below that the engine does **not** yet produce are: `testMode` (there is no quick/full mode — see `app.js`), `degraded`/`degradedReason`, per-metric `bins`/`samples` arrays, `p90`, `rfc3550` jitter, the `webrtc_datagram` loss method (the engine measures HTTP probe failure only), `uncached_wildcard_dns` resolution (the engine times DoH only), and the `A+` bufferbloat grade (`gradeBufferbloat` returns A–F). Treat this file as the roadmap for the export, and `core/measure.js` as the authority on what is measured today.
+
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -16,7 +18,7 @@ This document defines the JSON structure of an exported WifiPlus speed test resu
     "client",
     "server",
     "metrics",
-    "badges"
+    "metricStates"
   ],
   "properties": {
     "schemaVersion": {
@@ -152,17 +154,22 @@ This document defines the JSON structure of an exported WifiPlus speed test resu
         }
       }
     },
-    "badges": {
+    "metricStates": {
       "type": "object",
-      "additionalProperties": { "type": "string", "enum": ["measured", "estimated"] },
+      "description": "Provenance per metric, from core/metric-state.js. Exported so a shared result carries the difference between a figure that was measured and one that was not — a bare null cannot say whether the metric was skipped, impossible or broken. 'measured' appears only where a finite, validated number exists.",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["not-started", "testing", "measured", "unavailable", "error"]
+      },
       "example": {
         "download": "measured",
-        "upload": "measured",
+        "upload": "error",
         "ping": "measured",
         "jitter": "measured",
-        "packetLoss": "measured",
-        "dnsLatency": "measured",
-        "stability": "measured"
+        "loss": "measured",
+        "dns": "unavailable",
+        "stability": "measured",
+        "bufferbloat": "measured"
       }
     }
   }

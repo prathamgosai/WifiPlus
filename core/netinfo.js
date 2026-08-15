@@ -11,6 +11,108 @@
 const META_URL = "https://speed.cloudflare.com/meta";
 
 /**
+ * Fallback source for the same facts.
+ *
+ * `/meta` is a JSON convenience route and it is not always reachable: it returns
+ * 403 to non-browser user agents, and privacy extensions block the whole
+ * `speed.cloudflare.com` host by name. Either way `detectNetwork` fell straight
+ * through to its catch and the strip showed "Provider unavailable" on a working
+ * connection. `/cdn-cgi/trace` is the edge's own diagnostic, served from every
+ * Cloudflare property with `Access-Control-Allow-Origin: *`, and it reports the
+ * client IP, the serving colo, the country and the negotiated protocol.
+ */
+const TRACE_URL = "https://speed.cloudflare.com/cdn-cgi/trace";
+
+/**
+ * DNS-over-HTTPS resolver used for the ASN lookup below. Already the resolver
+ * the DNS-latency measurement times, so this adds no new host to the CSP.
+ */
+const DOH_URL = "https://cloudflare-dns.com/dns-query";
+
+/** Deadline for the ASN enrichment. Advisory data must not delay the strip. */
+const ASN_TIMEOUT_MS = 2500;
+
+/**
+ * Parse the `key=value` lines of a `/cdn-cgi/trace` response.
+ *
+ * @param {string} text
+ * @returns {Record<string, string>}
+ */
+export function parseTrace(text) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const line of text.split("\n")) {
+    const eq = line.indexOf("=");
+    if (eq > 0) out[line.slice(0, eq)] = line.slice(eq + 1);
+  }
+  return out;
+}
+
+/**
+ * Real ASN and network name for an IP, from Team Cymru's public IP-to-ASN
+ * service, queried over DNS-over-HTTPS.
+ *
+ * This is a genuine lookup, not a guess: `<reversed-ip>.origin.asn.cymru.com`
+ * returns a TXT record of "ASN | prefix | country | registry | date", and
+ * `AS<n>.asn.cymru.com` returns that ASN's registered name. It exists because
+ * `/cdn-cgi/trace` reports the address but not who announces it, and the
+ * Provider tile has to say something true or say nothing.
+ *
+ * IPv6 is not attempted — the nibble-reversed form Cymru wants for v6 is a
+ * different construction, and returning null is better than half-implementing
+ * it and mislabelling someone's provider.
+ *
+ * @param {string} ip
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<{ asn: number, isp: string | null } | null>}
+ */
+export async function lookupAsn(ip, signal) {
+  if (!ip || ip.includes(":")) return null;
+  const octets = ip.split(".");
+  if (octets.length !== 4) return null;
+
+  const controller = new AbortController();
+  const onOuterAbort = () => controller.abort();
+  signal?.addEventListener("abort", onOuterAbort);
+  const timer = setTimeout(() => controller.abort(), ASN_TIMEOUT_MS);
+
+  /**
+   * @param {string} name
+   * @returns {Promise<string | null>} first TXT record, unquoted
+   */
+  const txt = async (name) => {
+    const res = await fetch(`${DOH_URL}?name=${name}&type=TXT`, {
+      headers: { accept: "application/dns-json" },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    const data = body?.Answer?.[0]?.data;
+    return typeof data === "string" ? data.replace(/"/g, "") : null;
+  };
+
+  try {
+    const origin = await txt(`${octets.reverse().join(".")}.origin.asn.cymru.com`);
+    if (!origin) return null;
+    const asn = Number(origin.split("|")[0]?.trim());
+    if (!Number.isFinite(asn) || asn <= 0) return null;
+
+    // The name is a nicety on top of the number; a failure here still leaves a
+    // real ASN to show.
+    const described = await txt(`AS${asn}.asn.cymru.com`).catch(() => null);
+    // "9829 | IN | apnic | 2000-01-19 | BSNL-NIB - National Internet Backbone, IN"
+    const name = described?.split("|")[4]?.trim() || null;
+    return { asn, isp: name };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", onOuterAbort);
+  }
+}
+
+/**
  * Deadline for the edge lookup.
  *
  * Without one, a blocked or slow request leaves the caller awaiting for as long
@@ -181,25 +283,72 @@ export async function detectNetwork(signal, timeoutMs = META_TIMEOUT_MS) {
   const timer = setTimeout(() => internal.abort(), timeoutMs);
 
   try {
-    const res = await fetch(META_URL, { cache: "no-store", signal: internal.signal });
-    if (!res.ok) return base;
-    const meta = await res.json();
+    // Preferred source: one request, everything enriched, including the ISP name
+    // Cloudflare already knows.
+    try {
+      const res = await fetch(META_URL, { cache: "no-store", signal: internal.signal });
+      if (res.ok) {
+        const meta = await res.json();
+        const ip = meta.clientIp ?? null;
+        const colo = readColo(meta.colo);
+        // A 200 carrying no address is not a usable answer — fall through to the
+        // trace route rather than painting a strip of nulls.
+        if (ip) {
+          return {
+            ...base,
+            ip,
+            ipVersion: ip.includes(":") ? "IPv6" : "IPv4",
+            isp: meta.asOrganization ?? null,
+            asn: typeof meta.asn === "number" ? meta.asn : null,
+            colo: colo.code,
+            edgeCity: colo.city,
+            city: meta.city ?? null,
+            region: meta.region ?? null,
+            country: meta.country ?? null,
+            httpProtocol: meta.httpProtocol ?? null,
+          };
+        }
+      }
+    } catch {
+      /* blocked or refused — the trace route below is the second opinion */
+    }
 
-    const ip = meta.clientIp ?? null;
-    const colo = readColo(meta.colo);
+    // The deadline (or the caller) may have fired while the first attempt was
+    // in flight, and the catch above cannot tell that apart from a refusal.
+    // Without this check the fallback issues a SECOND request against an
+    // already-aborted signal, so a deadline meant to bound the whole lookup
+    // bounded only its first half — and against an endpoint that never answers,
+    // it hung indefinitely.
+    if (internal.signal.aborted) return base;
+
+    // Fallback: the edge's own diagnostic. Same facts, minus the ASN, which the
+    // Cymru lookup then supplies from DNS.
+    const traceRes = await fetch(`${TRACE_URL}?cb=${Date.now()}`, {
+      cache: "no-store",
+      signal: internal.signal,
+    });
+    if (!traceRes.ok) return base;
+    const trace = parseTrace(await traceRes.text());
+
+    const ip = trace.ip || null;
+    if (!ip) return base;
+    const colo = readColo(trace.colo);
+    const asn = await lookupAsn(ip, internal.signal);
 
     return {
       ...base,
       ip,
-      ipVersion: ip ? (ip.includes(":") ? "IPv6" : "IPv4") : null,
-      isp: meta.asOrganization ?? null,
-      asn: typeof meta.asn === "number" ? meta.asn : null,
+      ipVersion: ip.includes(":") ? "IPv6" : "IPv4",
+      isp: asn?.isp ?? null,
+      asn: asn?.asn ?? null,
       colo: colo.code,
       edgeCity: colo.city,
-      city: meta.city ?? null,
-      region: meta.region ?? null,
-      country: meta.country ?? null,
-      httpProtocol: meta.httpProtocol ?? null,
+      city: null,
+      region: null,
+      // `loc` is the country the edge sees, which is the only geography this
+      // route reports. It is not a city, so it must not be shown as one.
+      country: trace.loc || null,
+      httpProtocol: trace.http ? trace.http.toUpperCase() : null,
     };
   } catch {
     // Blocked, offline, or past the deadline — return what could be derived

@@ -1021,16 +1021,51 @@
       border-radius: 999px;
     }
 
+    /* One colour per measurement STATE, set by core/metric-state.js. Teal is
+       reserved for "measured" so it can only appear where a real number does;
+       every other state reads as visibly not-a-result. The classes are written
+       by app.js from the state map — never by hand in this file, which is how
+       every card came to ship claiming "measured" while its value was a dash. */
     .badge.measured {
       background: color-mix(in srgb, var(--teal) 16%, transparent);
       border: 1px solid color-mix(in srgb, var(--teal) 45%, transparent);
       color: var(--teal);
     }
 
-    .badge.estimated {
+    .badge.not-started {
+      background: color-mix(in srgb, var(--muted) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--muted) 32%, transparent);
+      color: var(--muted);
+    }
+
+    /* Pulses while in flight, so a card that is working is distinguishable at a
+       glance from one that has finished. */
+    .badge.testing {
+      background: color-mix(in srgb, var(--blue) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--blue) 45%, transparent);
+      color: var(--blue);
+      animation: badge-pulse 1.4s ease-in-out infinite;
+    }
+
+    @keyframes badge-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .badge.testing { animation: none; }
+    }
+
+    .badge.unavailable {
       background: color-mix(in srgb, var(--amber) 16%, transparent);
       border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
       color: var(--amber);
+    }
+
+    .badge.error {
+      background: color-mix(in srgb, #ef4444 16%, transparent);
+      border: 1px solid color-mix(in srgb, #ef4444 45%, transparent);
+      color: #f87171;
     }
 
     .metric-value {
@@ -2435,7 +2470,7 @@
 
           <div class="gauge-stage">
             <button class="go-button" id="goButton" type="button" aria-label="Start WiFi speed test">GO</button>
-            <p class="go-caption" id="goCaption">Press GO to test your WiFi — about 11 seconds, no signup.</p>
+            <p class="go-caption" id="goCaption">Press GO to test your WiFi — about 12 seconds of real data transfer, no signup.</p>
 
             <div class="gauge" id="gauge" hidden aria-hidden="true">
               <svg viewBox="0 0 340 356" role="img" aria-label="Live speed gauge">
@@ -2475,7 +2510,7 @@
             <article class="metric featured">
               <div class="metric-header">
                 <span class="metric-label">Download</span>
-                <span class="badge measured" id="badgeDownload">measured</span>
+                <span class="badge not-started" id="badgeDownload">not tested</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="downloadValue">—</span><span class="unit">Mbps</span></div>
               <p>Measures how fast data is received from the nearest edge node.</p>
@@ -2484,7 +2519,7 @@
             <article class="metric">
               <div class="metric-header">
                 <span class="metric-label">Upload</span>
-                <span class="badge measured" id="badgeUpload">measured</span>
+                <span class="badge not-started" id="badgeUpload">not tested</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="uploadValue">—</span><span class="unit">Mbps</span></div>
               <p>Measures how fast data is sent to the network.</p>
@@ -2493,7 +2528,7 @@
             <article class="metric">
               <div class="metric-header">
                 <span class="metric-label">Ping</span>
-                <span class="badge measured" id="badgePing">measured</span>
+                <span class="badge not-started" id="badgePing">not tested</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="pingValue">—</span><span class="unit">ms</span></div>
               <p>Lower latency is better for gaming and calls.</p>
@@ -2502,7 +2537,7 @@
             <article class="metric">
               <div class="metric-header">
                 <span class="metric-label">Jitter</span>
-                <span class="badge measured" id="badgeJitter">measured</span>
+                <span class="badge not-started" id="badgeJitter">not tested</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="jitterValue">—</span><span class="unit">ms</span></div>
               <p>Measures latency consistency over time.</p>
@@ -2510,15 +2545,15 @@
             <article class="metric">
               <div class="metric-header">
                 <span class="metric-label" id="labelLoss">App-level Packet Loss</span>
-                <span class="badge estimated" id="badgeLoss">estimated</span>
+                <span class="badge not-started" id="badgeLoss">not tested</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="lossValue">—</span><span class="unit">%</span></div>
-              <p>Share of latency probes that timed out. A browser cannot observe true packet loss — TCP hides it by resending — so timeout rate is the estimated proxy available.</p>
+              <p>Application-level loss: the share of latency probes that never came back, out of the probes actually sent. A browser cannot observe true ICMP packet loss — TCP hides it by resending — so this measures probe failure, which is the closest a web page can honestly get.</p>
             </article>
             <article class="metric">
               <div class="metric-header">
                 <span class="metric-label">DNS latency</span>
-                <span class="badge estimated" id="badgeDns">estimated</span>
+                <span class="badge not-started" id="badgeDns">not tested</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="dnsValue">—</span><span class="unit">ms</span></div>
               <p>Time for an uncached lookup through Cloudflare's DNS-over-HTTPS resolver — not the resolver your system is set to use, which a browser cannot query.</p>
@@ -2526,7 +2561,7 @@
             <article class="metric">
               <div class="metric-header">
                 <span class="metric-label">Stability</span>
-                <span class="badge measured" id="badgeStability">measured</span>
+                <span class="badge not-started" id="badgeStability">not tested</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="stabilityValue">—</span><span class="unit">%</span></div>
               <p>Combines jitter, packet loss, and variance.</p>
@@ -2534,7 +2569,7 @@
             <article class="metric">
               <div class="metric-header">
                 <span class="metric-label">Loaded Latency</span>
-                <span class="badge measured" id="badgeBufferbloat">measured</span>
+                <span class="badge not-started" id="badgeBufferbloat">not tested</span>
               </div>
               <div class="metric-value" data-empty="true"><span id="bufferbloatValue">—</span><span class="unit">ms</span></div>
               <p>Latency added under heavy network load (Bufferbloat grade).</p>
@@ -2587,7 +2622,7 @@
               <button class="button secondary" id="copyResultLink" type="button">Copy Result Link</button>
               <button class="button secondary" id="copyResultJson" type="button">Copy JSON</button>
             </div>
-            <p class="test-note" id="testStatus">Ready. About 11 seconds for download, upload, adaptive latency probing with p95, packet loss, DNS and a bufferbloat grade — real bytes over a global edge network, no ads, no signup, no simulated values.</p>
+            <p class="test-note" id="testStatus">Ready. Roughly 12 seconds: adaptive latency probing with p95 and packet loss, a 6-second download window and a 4-second upload window, plus DNS and latency under load. Real bytes over a global edge network — every figure below is measured or marked unavailable.</p>
             <!-- Named because the result means nothing without it: the same link
                  measures differently against an edge 5ms away and one 200ms away. -->
             <p class="test-edge" id="selectedEdge" hidden></p>

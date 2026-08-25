@@ -10,6 +10,7 @@ import {
   bufferbloatFrom,
   gradeBufferbloat,
   MIN_LOADED_PROBES,
+  MIN_LOADED_PROBES_MEDIAN,
   percentile,
   stabilityFrom,
 } from "../measure.js";
@@ -126,11 +127,39 @@ describe("bufferbloatFrom", () => {
     // not about the user's router.
     expect(bufferbloatFrom(35, [])).toBeNull();
     expect(bufferbloatFrom(71, [35605])).toBeNull();
-    expect(bufferbloatFrom(71, steady(300, MIN_LOADED_PROBES - 1))).toBeNull();
+    expect(bufferbloatFrom(71, steady(300, MIN_LOADED_PROBES_MEDIAN - 1))).toBeNull();
   });
 
-  it("grades once the minimum number of probes is met", () => {
-    expect(bufferbloatFrom(20, steady(25, MIN_LOADED_PROBES))).not.toBeNull();
+  it("uses the p95 once there are enough probes to have a tail, and says so", () => {
+    const bloat = bufferbloatFrom(20, steady(25, MIN_LOADED_PROBES));
+    expect(bloat).not.toBeNull();
+    expect(bloat?.basis).toBe("p95");
+    expect(bloat?.probes).toBe(MIN_LOADED_PROBES);
+  });
+
+  it("falls back to the median on a small sample rather than reporting nothing", () => {
+    // A saturated uplink makes its own probes slow — measured at 772ms each
+    // against 82ms idle — so few of them fit in any sane window. Reporting "not
+    // measurable" for a link whose latency had risen ninefold was the worse
+    // answer. The p95 is NOT lowered to meet the sample: at five probes the p95
+    // is the maximum, which is the trap the threshold exists to prevent.
+    const sample = MIN_LOADED_PROBES_MEDIAN;
+    const bloat = bufferbloatFrom(80, steady(770, sample));
+    expect(bloat).not.toBeNull();
+    expect(bloat?.basis).toBe("median");
+    expect(bloat?.probes).toBe(sample);
+    expect(bloat?.increase).toBe(690);
+  });
+
+  it("cannot let one straggler set a small-sample grade", () => {
+    // Four ordinary probes and one freak stall. Under a p95 the stall IS the
+    // answer; under the median it is one sample out of five, which is what it
+    // deserves to be.
+    const bloat = bufferbloatFrom(50, [60, 62, 65, 68, 9000]);
+    expect(bloat?.basis).toBe("median");
+    // Graded on 65ms, not on 9000ms.
+    expect(bloat?.increase).toBe(15);
+    expect(bloat?.grade).toBe("A");
   });
 });
 

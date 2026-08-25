@@ -12,11 +12,16 @@ export class TestAborted extends Error {
 }
 
 // Math Utilities
+/**
+ * @param {number} bytes
+ * @param {number} durationMs
+ */
 function calculateMbps(bytes, durationMs) {
   if (!durationMs || durationMs <= 0) return 0;
   return (bytes * 8) / durationMs / 1000;
 }
 
+/** @param {number[]} arr */
 function calculateMedian(arr) {
   if (!arr.length) return 0;
   const sorted = [...arr].sort((a, b) => a - b);
@@ -24,6 +29,7 @@ function calculateMedian(arr) {
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+/** @param {number[]} arr */
 function calculateP95(arr) {
   if (!arr.length) return 0;
   const sorted = [...arr].sort((a, b) => a - b);
@@ -31,6 +37,7 @@ function calculateP95(arr) {
   return sorted[rank];
 }
 
+/** @param {number[]} arr */
 function calculateJitter(arr) {
   if (arr.length < 2) return 0;
   let totalDiff = 0;
@@ -40,6 +47,7 @@ function calculateJitter(arr) {
   return totalDiff / (arr.length - 1);
 }
 
+/** @param {number} increase */
 function bufferbloatGrade(increase) {
   if (increase < 5) return 'A';
   if (increase < 30) return 'B';
@@ -56,6 +64,7 @@ function getUUID() {
 }
 
 // Measurement Runners
+/** @param {AbortSignal} [signal] */
 async function measureDns(signal) {
   const samples = [];
   for (let i = 0; i < 4; i++) {
@@ -96,6 +105,12 @@ async function measureDns(signal) {
   return calculateMedian(samples);
 }
 
+/**
+ * @param {string} endpointUrl
+ * @param {number} probes
+ * @param {AbortSignal} [signal]
+ * @param {(done: number, total: number, lastRtt: number) => void} [onProbe]
+ */
 async function measureLatency(endpointUrl, probes, signal, onProbe) {
   const testId = getUUID();
   let failed = 0;
@@ -133,6 +148,13 @@ async function measureLatency(endpointUrl, probes, signal, onProbe) {
   return { samples, failed, total: probes };
 }
 
+/**
+ * @param {'down' | 'up'} direction
+ * @param {string} endpointUrl
+ * @param {number} durationMs
+ * @param {any} handlers
+ * @param {AbortSignal} [signal]
+ */
 async function measureThroughput(direction, endpointUrl, durationMs, handlers, signal) {
   const testId = getUUID();
   let totalBytes = 0;
@@ -141,10 +163,12 @@ async function measureThroughput(direction, endpointUrl, durationMs, handlers, s
   const maxStreams = 8;
   const start = performance.now();
   
+  /** @type {{promise: Promise<void>, controller: AbortController}[]} */
   let streams = [];
   let isDone = false;
   
   // To track ramp-up vs sustained
+  /** @type {number | null} */
   let sustainedStart = null;
   let sustainedBytesStart = 0;
 
@@ -198,7 +222,7 @@ async function measureThroughput(direction, endpointUrl, durationMs, handlers, s
   }, 250);
 
   // Stop test when duration hits
-  const timeoutPromise = new Promise(resolve => {
+  const timeoutPromise = new Promise(/** @param {Function} resolve */ resolve => {
     const check = setInterval(() => {
       if (performance.now() - start >= durationMs || signal?.aborted) {
         clearInterval(check);
@@ -216,11 +240,16 @@ async function measureThroughput(direction, endpointUrl, durationMs, handlers, s
   // Abort all active streams cleanly
   streams.forEach(s => s.controller.abort());
   
-  const sustainedElapsed = performance.now() - sustainedStart;
+  const sustainedElapsed = performance.now() - (sustainedStart || start);
   const sustainedBytes = totalBytes - sustainedBytesStart;
   return calculateMbps(sustainedBytes, sustainedElapsed);
 }
 
+/**
+ * @param {string} url
+ * @param {AbortSignal} signal
+ * @param {(bytes: number) => void} onBytes
+ */
 async function runDownloadStream(url, signal, onBytes) {
   try {
     const res = await fetch(url, { cache: 'no-store', signal });
@@ -240,6 +269,11 @@ async function runDownloadStream(url, signal, onBytes) {
   }
 }
 
+/**
+ * @param {string} url
+ * @param {AbortSignal} signal
+ * @param {(bytes: number) => void} onBytes
+ */
 async function runUploadStream(url, signal, onBytes) {
   try {
     // 1MB incompressible chunk
@@ -262,6 +296,11 @@ async function runUploadStream(url, signal, onBytes) {
   }
 }
 
+/**
+ * @param {any} handlers
+ * @param {AbortSignal} [signal]
+ * @param {boolean} [isQuick]
+ */
 export async function runMeasurement(handlers = {}, signal, isQuick = false) {
   if (signal?.aborted) throw new TestAborted();
 
@@ -316,6 +355,7 @@ export async function runMeasurement(handlers = {}, signal, isQuick = false) {
   const downDuration = isQuick ? 5000 : 10000;
   
   // Start background latency probes for bufferbloat
+  /** @type {number[]} */
   const bbSamples = [];
   const bbController = new AbortController();
   const onMainAbort = () => bbController.abort();

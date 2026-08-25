@@ -24,7 +24,13 @@ const DNS_URL = "https://cloudflare-dns.com/dns-query";
 // A short window samples whatever the link happened to be doing for two seconds;
 // this samples enough of it to describe the link instead.
 export const MEASURE_MS = 6000; // download window
-export const UPLOAD_MEASURE_MS = 4000; // upload window, shorter as uploads ramp slower
+export const UPLOAD_MEASURE_MS = 8000;
+/**
+ * Pause before the upload window opens, to let the router's queue drain after
+ * the download. Exported because the loaded-latency probe has to start after it
+ * — probing during the pause samples an idle link and flatters the grade.
+ */
+export const UPLOAD_SETTLE_MS = 400; // see the note above measureUpload on why this is not 4000
 export const WARMUP_MS = 500; // ignored while the TCP/QUIC congestion window ramps
 export const DOWN_STREAMS = 8; // parallel streams are needed to saturate a fast link
 export const UP_STREAMS = 4;
@@ -288,16 +294,24 @@ export async function withFailover(candidates, phase, signal, onFallback) {
 
 /**
  * @typedef {object} LatencyResult
- * @property {number} ping Median round trip, ms.
+ *
+ * Every field is nullable, and that is the point rather than an oversight: a
+ * latency phase can fail outright, and the shape it degrades to is what stops
+ * a front end from publishing a fabricated reading. Substituting zeros here
+ * put a "measured" badge on a 0 ms ping and 0% loss for a browser that was
+ * offline, because 0 is a finite number and every gate downstream asks only
+ * whether the value is finite.
+ *
+ * @property {number | null} ping Median round trip, ms.
  * @property {number | null} jitter Mean absolute delta of consecutive round
  *   trips, ms. Null when fewer than two probes returned, since variation
  *   between samples is undefined with one sample.
- * @property {number} loss Percentage of probes that never came back.
- * @property {number} min
- * @property {number} max
- * @property {number} p95 The tail users actually feel.
- * @property {number} variance Standard deviation of the samples, ms.
- * @property {number[]} samples Ascending.
+ * @property {number | null} loss Percentage of probes that never came back.
+ * @property {number | null} min
+ * @property {number | null} max
+ * @property {number | null} p95 The tail users actually feel.
+ * @property {number | null} variance Standard deviation of the samples, ms.
+ * @property {number[]} samples Ascending. Empty when nothing came back.
  */
 
 /**
@@ -351,6 +365,15 @@ export async function measureLatency(onSample, signal, endpoint = cloudflareEndp
         cache: "no-store",
         signal: probe.signal,
       });
+      // A REPLY IS NOT AN ANSWER. The download path has always refused to count
+      // bytes from a non-OK response; the latency path did not check at all, and
+      // an error page is the fastest thing a server ever sends. An edge shedding
+      // load with 429s, a 502 from a proxy, or a captive portal answering every
+      // request instantly would all be timed as excellent round trips — and
+      // because the fetch resolved, the same run would report 0% probe loss.
+      // The failure mode is perverse: the sicker the server, the better the
+      // latency and loss figures it produces.
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await res.arrayBuffer();
       // The first request pays TCP + TLS handshake cost and is not
       // representative of steady-state latency, so it is dropped.
@@ -475,6 +498,10 @@ function runningStats(samples, failed, attempted) {
  * @property {number} loaded Median latency while the link is saturated, ms.
  * @property {number} increase How much latency rose under load, ms.
  * @property {"A" | "B" | "C" | "D" | "F"} grade
+ * @property {"p95" | "median"} basis Which statistic the grade was taken from.
+ *   A p95 needs enough samples to have a tail; below that the median is used and
+ *   said so, rather than the two being interchanged behind one word.
+ * @property {number} probes How many probes landed under load.
  */
 
 /**
@@ -487,17 +514,45 @@ function runningStats(samples, failed, attempted) {
  * @param {(latency: number) => void} [onProbe]
  * @param {AbortSignal} [signal]
  * @param {import("./endpoints.js").Endpoint} [endpoint]
+ * @param {number} [windowMs] how long to keep probing. Defaults to the download
+ *   window; the upload phase passes its own, because latency under UPLOAD load
+ *   is a different measurement and the two windows are different lengths.
+ * @param {number} [settleMs] how long to wait for the transfer to saturate the
+ *   link before the first probe. The upload phase needs longer, because it
+ *   begins with a pause of its own.
+ * @param {() => boolean} [shouldStop] asked before each probe. The phase this
+ *   is measuring can end early — an upload that fails against every endpoint
+ *   returns in milliseconds — and probes taken after that are sampling an IDLE
+ *   link while being pooled into a grade about a saturated one. They would also
+ *   hold the whole run open for the rest of the window for no reason.
  * @returns {Promise<number[]>} raw probe RTTs
  */
-export async function measureLoadedLatency(onProbe, signal, endpoint = cloudflareEndpoint) {
+export async function measureLoadedLatency(
+  onProbe,
+  signal,
+  endpoint = cloudflareEndpoint,
+  windowMs = MEASURE_MS,
+  settleMs = 350,
+  shouldStop,
+) {
   /** @type {number[]} */
   const probes = [];
-  const deadline = performance.now() + MEASURE_MS;
-  // Let the download streams reach saturation before sampling.
-  await sleep(350, signal);
+  // Let the transfer reach saturation before sampling — and stamp the deadline
+  // AFTER that wait, so the probe window is the full loaded window rather than
+  // the window minus the settle.
+  //
+  // The upload phase needs a longer wait than the download does, because it
+  // opens with its own SETTLE_MS pause to let the download's queue drain. Probes
+  // fired during that pause sample an IDLE link and were being pooled into the
+  // upload bufferbloat grade, which biases the grade BETTER — the one direction
+  // this codebase does not allow an error to point.
+  await sleep(settleMs, signal);
+  const deadline = performance.now() + Math.max(0, windowMs - settleMs);
 
   while (performance.now() < deadline) {
     assertLive(signal);
+    // The load ended before its window did, so there is nothing left to measure.
+    if (shouldStop?.()) break;
     const started = performance.now();
 
     // Bounded, for the same reason the idle probes are: a probe that cannot get
@@ -513,6 +568,12 @@ export async function measureLoadedLatency(onProbe, signal, endpoint = cloudflar
         cache: "no-store",
         signal: probe.signal,
       });
+      // Status-checked for the same reason the idle probe is, and with more at
+      // stake: an edge that starts shedding requests once the download saturates
+      // it returns 429s or 503s FASTER than it returns real replies. Timing
+      // those would report falling latency exactly as the link became
+      // unusable, and hand an A to the worst connections in the sample.
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await res.arrayBuffer();
       const rtt = performance.now() - started;
       probes.push(rtt);
@@ -525,7 +586,7 @@ export async function measureLoadedLatency(onProbe, signal, endpoint = cloudflar
       signal?.removeEventListener("abort", onOuterAbort);
     }
 
-    await sleep(90, signal);
+    await sleep(60, signal);
   }
   return probes;
 }
@@ -542,6 +603,25 @@ export async function measureLoadedLatency(onProbe, signal, endpoint = cloudflar
  * probes, so ten is easily met; below it, "not measurable" is the honest answer.
  */
 export const MIN_LOADED_PROBES = 10;
+
+/**
+ * Fewest probes that support a MEDIAN-based grade.
+ *
+ * A saturated uplink makes its own probes slow — measured at 772ms each against
+ * 82ms idle — so the number of samples that fit in any sane window is small by
+ * construction, and the upload direction was reporting "not measurable" on
+ * links whose latency had risen ninefold. That is a worse answer than a
+ * carefully qualified one.
+ *
+ * The p95 is not lowered to meet them: the p95 of five samples IS the maximum,
+ * which is the trap MIN_LOADED_PROBES exists to prevent. Instead, below that
+ * threshold the grade is taken from the MEDIAN of the loaded probes, which five
+ * samples do support, and the result says which statistic it used so the two
+ * are never silently interchanged. A median-based grade is conservative — it
+ * describes the typical delay rather than the tail — and the result carries
+ * `basis` so a reader knows they are seeing the gentler of the two readings.
+ */
+export const MIN_LOADED_PROBES_MEDIAN = 5;
 
 /**
  * @param {number} increase ms of added latency under load
@@ -569,22 +649,66 @@ export function bufferbloatFrom(idleMedian, loadedSamples) {
   // Too few probes survived to describe anything. Reporting a grade from one or
   // two stragglers is how a browser connection queue got presented to a user as
   // "+35534 ms under load, grade F" — a number about Chrome, not their router.
-  if (loadedSamples.length < MIN_LOADED_PROBES) return null;
+  if (loadedSamples.length < MIN_LOADED_PROBES_MEDIAN) return null;
 
-  // The TAIL under load, not the middle of it. Bufferbloat is felt when a
-  // packet lands behind a full queue, which is a p95 event — taking the median
-  // of the loaded probes averages those spikes away and reports a comfortable
-  // number for a link that stutters every few seconds.
   const sorted = [...loadedSamples].sort((a, b) => a - b);
-  const loaded = percentile(sorted, 95);
+
+  // The TAIL under load, not the middle of it — when there are enough samples
+  // to have a tail. Bufferbloat is felt when a packet lands behind a full
+  // queue, which is a p95 event; taking the median of a large sample averages
+  // those spikes away and reports a comfortable number for a link that stutters
+  // every few seconds.
+  //
+  // Below MIN_LOADED_PROBES the p95 degenerates into the maximum, so the median
+  // is used instead and named. Two different statistics quietly sharing one
+  // label would be worse than either.
+  const usesTail = sorted.length >= MIN_LOADED_PROBES;
+  const loaded = usesTail
+    ? percentile(sorted, 95)
+    : (sorted[Math.floor(sorted.length / 2)] ?? 0);
+
   const increase = Math.max(0, Math.round(loaded - idleMedian));
   return {
     idle: Math.round(idleMedian),
     loaded: Math.round(loaded),
     increase,
     grade: gradeBufferbloat(increase),
+    basis: usesTail ? "p95" : "median",
+    probes: sorted.length,
   };
 }
+
+/**
+ * A throughput measurement together with the evidence it was derived from.
+ *
+ * The phases used to return a bare number, which made the central promise of
+ * this project unkeepable: a figure with no bytes and no duration behind it
+ * cannot be reconciled, cannot be audited, and cannot be shown to disagree with
+ * itself. Every field here exists so that a reader — or a validator — can
+ * recompute the headline number and check it.
+ *
+ * @typedef {object} ThroughputResult
+ * @property {number} mbps The reported figure.
+ * @property {number} bytes Every byte counted in the phase.
+ * @property {number} elapsedMs Wall clock for the whole phase.
+ * @property {number} measuredBytes The numerator `mbps` was actually computed from.
+ * @property {number} measuredMs The denominator, in ms.
+ * @property {number[]} samples Per-interval rates, the raw trace.
+ * @property {number} streams Parallel connections used.
+ * @property {string} method How `mbps` was derived, named so a result can say so.
+ * @property {number} reconciliationMbps An INDEPENDENT rate over the whole phase.
+ *   Computed a different way on purpose: if it disagrees materially with
+ *   `mbps`, something is wrong and the run says so instead of picking one.
+ * @property {number} warmupMs Time excluded at the start of the phase.
+ * @property {string | null} [protocol] Negotiated HTTP version, when known.
+ * @property {Array<{ bytes: number, ms: number, at: number }>} [posts] Upload only.
+ * @property {number} [inflatedResponses] Download only — responses that
+ *   delivered more decoded bytes than they advertised, which means something on
+ *   the path compressed the payload and the byte count is not wire bytes.
+ * @property {Array<{ bytes: number, ms: number }>} [intervals] Download only —
+ *   each sample with the span it covers, which is what makes the aggregate
+ *   weightable. `samples` is the same data reduced to rates, for display.
+ */
 
 /**
  * Width of the window the LIVE tile reports over.
@@ -649,7 +773,7 @@ function createLiveRate(startAt) {
  * @param {import("./endpoints.js").Endpoint} [endpoint]
  * @param {(mbps: number) => void} [onSample] one per closed interval, for the
  *   stability score — the raw distribution of throughput over the phase.
- * @returns {Promise<number>} Mbps
+ * @returns {Promise<ThroughputResult>}
  */
 export async function measureDownload(onProgress, signal, endpoint = cloudflareEndpoint, onSample) {
   // Capped so a concurrent latency probe can still get a socket on HTTP/1.1.
@@ -661,17 +785,34 @@ export async function measureDownload(onProgress, signal, endpoint = cloudflareE
   let stop = false;
 
   /**
-   * Bytes per BUCKET_MS interval after warm-up. One average over the whole
-   * window is at the mercy of whatever happened during it — a single stall or a
-   * burst moves the result by tens of Mbps. Per-interval samples let the
-   * outliers be trimmed and the typical rate reported.
+   * One entry per closed interval after warm-up, carrying BOTH the bytes and
+   * the span they arrived over. The span is the part that matters: buckets are
+   * not equal width, so a rate alone is not enough to average them correctly.
    *
-   * @type {number[]}
+   * @type {Array<{ bytes: number, ms: number }>}
    */
   const buckets = [];
   let bucketBytes = 0;
   let bucketStart = 0;
   const liveRate = createLiveRate(0);
+
+  /**
+   * Responses that delivered MORE decoded bytes than they advertised.
+   *
+   * `total += value.length` counts bytes after any transfer decoding, which is
+   * the right number for a speed test — goodput is what an application gets.
+   * But it is the wrong number if something on the path compressed the payload
+   * and the browser inflated it again: the counter would then be measuring the
+   * decompressor rather than the link. Cloudflare's default payload is a single
+   * repeated character, which gzips at roughly 1000:1, so a TLS-intercepting
+   * proxy that re-encoded it could report a 50 Mbps line as tens of gigabits.
+   *
+   * Content-Length is CORS-safelisted and this endpoint sends it, so the two can
+   * be compared. This is not airtight — a middlebox that also rewrites the
+   * header defeats it — but it turns a silent hundredfold error into a stated
+   * one, which is the difference that matters.
+   */
+  let inflatedResponses = 0;
 
   // Cancelling the requests as well as the readers means eight streams don't
   // keep pulling bytes — and burning the user's data — after the window closes.
@@ -698,10 +839,17 @@ export async function measureDownload(onProgress, signal, endpoint = cloudflareE
         signal,
       );
       if (!res.body) break;
+      // Optional-chained: a Response is guaranteed to carry `headers`, but the
+      // test transport and any future stub are not, and a TypeError here is
+      // swallowed by the per-stream catch — which turns a header read into
+      // "No download data received" for the whole run.
+      const advertised = Number(res.headers?.get?.("content-length"));
+      let responseBytes = 0;
       const reader = res.body.getReader();
       while (!stop) {
         const { done, value } = await reader.read();
         if (done) break;
+        responseBytes += value.length;
         total += value.length;
         const elapsed = performance.now() - t0;
         if (!warmupDone && elapsed >= WARMUP_MS) {
@@ -713,8 +861,9 @@ export async function measureDownload(onProgress, signal, endpoint = cloudflareE
           bucketBytes += value.length;
           // Close a bucket every BUCKET_MS and start the next one.
           if (elapsed - bucketStart >= BUCKET_MS) {
-            const interval = bpsToMbps(bucketBytes, elapsed - bucketStart);
-            buckets.push(interval);
+            const span = elapsed - bucketStart;
+            const interval = bpsToMbps(bucketBytes, span);
+            buckets.push({ bytes: bucketBytes, ms: span });
             // Per-interval throughput, published so the stability score can be
             // computed from how much the rate actually varied. Only the
             // download's samples are exported: mixing them with the upload's
@@ -730,6 +879,12 @@ export async function measureDownload(onProgress, signal, endpoint = cloudflareE
         // than averaging over the phase so far.
         const live = liveRate(elapsed, value.length);
         if (warmupDone && live !== null) onProgress?.(live, elapsed / MEASURE_MS);
+      }
+      // Only meaningful for a response read to completion: a stream cancelled
+      // when the window closed will legitimately have fewer bytes than it
+      // advertised, which is not the direction being watched for.
+      if (Number.isFinite(advertised) && advertised > 0 && responseBytes > advertised * 1.01) {
+        inflatedResponses += 1;
       }
       reader.cancel().catch(() => {});
     }
@@ -763,15 +918,52 @@ export async function measureDownload(onProgress, signal, endpoint = cloudflareE
   // Zero is not a measurement of anything here; it is the same collapsed
   // division as the near-zero denominator below, seen from the other side.
   const postWarmupBytes = total - warmupBytes;
+
+  // The cross-check, computed the simplest way there is: every byte the reader
+  // handed over, across the whole phase. It cannot agree with the trimmed mean
+  // by construction — it includes the ramp — but it cannot disagree WILDLY
+  // either, and `validateThroughput` is what decides where the line is.
+  const flat = bpsToMbps(total, elapsed);
+  const protocol = negotiatedProtocol(endpoint);
+
   if (!warmupDone || measured < MIN_SAMPLE_MS || postWarmupBytes <= 0) {
     if (elapsed < MIN_SAMPLE_MS) throw new Error("Download ended too quickly to measure");
-    return bpsToMbps(total, elapsed);
+    return {
+      mbps: flat,
+      bytes: total,
+      elapsedMs: elapsed,
+      measuredBytes: total,
+      measuredMs: elapsed,
+      samples: buckets.map((b) => bpsToMbps(b.bytes, b.ms)),
+      intervals: buckets,
+      streams,
+      method: "flat-average",
+      reconciliationMbps: flat,
+      warmupMs: WARMUP_MS,
+      protocol,
+      inflatedResponses,
+    };
   }
 
-  // Prefer the trimmed mean of the interval samples; fall back to the flat
-  // average when the window was too short to produce enough of them.
-  const trimmed = trimmedMean(buckets);
-  return trimmed ?? bpsToMbps(total - warmupBytes, measured);
+  // Prefer the time-weighted trimmed mean of the interval samples; fall back to
+  // the flat post-warmup rate when the window was too short to produce enough.
+  const trimmed = timeWeightedTrimmedMean(buckets);
+  const postWarmupRate = bpsToMbps(postWarmupBytes, measured);
+  return {
+    mbps: trimmed ?? postWarmupRate,
+    bytes: total,
+    elapsedMs: elapsed,
+    measuredBytes: postWarmupBytes,
+    measuredMs: measured,
+    samples: buckets.map((b) => bpsToMbps(b.bytes, b.ms)),
+    intervals: buckets,
+    streams,
+    method: trimmed === null ? "post-warmup-average" : "trimmed-mean",
+    reconciliationMbps: postWarmupRate,
+    warmupMs: WARMUP_MS,
+    protocol,
+    inflatedResponses,
+  };
 }
 
 /** Width of one throughput sample. */
@@ -780,12 +972,12 @@ export const BUCKET_MS = 250;
 export const MIN_BUCKETS = 6;
 
 /**
- * Mean of the middle 60% of samples.
+ * Mean of the middle 60% of samples, by count.
  *
- * Trimming both ends removes the two things that made repeated runs disagree: a
- * momentary stall dragging the average down, and an early burst out of cache or
- * a fast first congestion window pulling it up. What is left is the rate the
- * link actually sustained.
+ * Correct only when every sample represents the same amount of time. Kept
+ * because the upload's samples are one per acknowledged POST and are compared
+ * like for like, and because it is the reference the time-weighted version
+ * below is tested against on evenly spaced input.
  *
  * @param {number[]} samples
  * @returns {number | null} null when there are too few to trim meaningfully
@@ -797,6 +989,65 @@ export function trimmedMean(samples) {
   const kept = sorted.slice(drop, sorted.length - drop);
   if (!kept.length) return null;
   return kept.reduce((a, b) => a + b, 0) / kept.length;
+}
+
+/**
+ * Sustained rate over the middle 60% of the phase, weighted by TIME.
+ *
+ * A download bucket closes on the first chunk to arrive at or after BUCKET_MS,
+ * so a bucket is *at least* 250ms and can be far longer: if the link stalls for
+ * two seconds, the reader does not wake, and the stall becomes ONE 2,000ms
+ * bucket. Averaging buckets by count then gives that stall the same weight as
+ * any 250ms of healthy transfer — one seventeenth of the answer instead of a
+ * third of it.
+ *
+ * Worked through: four seconds at 100 Mbps produces sixteen 250ms buckets; a
+ * two-second stall adds one more. The link moved 50 MB in six seconds, which is
+ * 66.7 Mbps. The mean of seventeen samples is 94.1 Mbps — a 41% overstatement,
+ * and it grows with the length of the stall. The direction is what makes it
+ * serious: this error only ever flatters, and it flatters worst exactly the
+ * unstable connections a speed test exists to expose.
+ *
+ * So the trim is taken over TIME rather than over sample count. Sort the
+ * intervals by rate, discard the slowest 20% and the fastest 20% *of the
+ * phase's duration*, and report total bytes over total time across what
+ * remains. An interval straddling a boundary is split proportionally, which is
+ * exact rather than approximate: an interval already asserts a constant rate
+ * across itself, so scaling its bytes and its milliseconds by the same fraction
+ * preserves that rate.
+ *
+ * @param {Array<{ bytes: number, ms: number }>} intervals
+ * @returns {number | null} null when there are too few to trim meaningfully
+ */
+export function timeWeightedTrimmedMean(intervals) {
+  const usable = intervals.filter((i) => i.ms > 0 && i.bytes >= 0);
+  if (usable.length < MIN_BUCKETS) return null;
+
+  const sorted = [...usable].sort((a, b) => a.bytes / a.ms - b.bytes / b.ms);
+  const totalMs = sorted.reduce((sum, i) => sum + i.ms, 0);
+  if (totalMs <= 0) return null;
+
+  const trimMs = totalMs * 0.2;
+  const keepFrom = trimMs;
+  const keepTo = totalMs - trimMs;
+
+  let bytes = 0;
+  let ms = 0;
+  let cursor = 0;
+  for (const interval of sorted) {
+    const start = cursor;
+    const end = cursor + interval.ms;
+    cursor = end;
+    const lo = Math.max(start, keepFrom);
+    const hi = Math.min(end, keepTo);
+    if (hi <= lo) continue;
+    const fraction = (hi - lo) / interval.ms;
+    bytes += interval.bytes * fraction;
+    ms += interval.ms * fraction;
+  }
+
+  if (ms <= 0) return null;
+  return bpsToMbps(bytes, ms);
 }
 
 /**
@@ -894,83 +1145,107 @@ function uploadWithProgress(url, body, onBytes, signal) {
 }
 
 /**
- * Upload throughput, counted from bytes the browser reports as transmitted.
+ * Upload throughput, counted from bytes the SERVER CONFIRMED it received.
  *
- * @param {(mbps: number, fraction: number) => void} [onProgress]
+ * WHY NOT `upload.onprogress` FOR THE FINAL FIGURE
+ * -----------------------------------------------------------------------------
+ * `XMLHttpRequest.upload.onprogress` reports bytes accepted by the local socket
+ * buffer, not bytes acknowledged by the peer, and the first event does not fire
+ * until a large block has already been accepted. Deriving a rate from those
+ * events therefore starts the clock AFTER the slowest part of the transfer and
+ * counts only what came later.
+ *
+ * Measured against this endpoint, one 1 MB POST reported its first progress
+ * event at t=181ms with 196,608 bytes already "loaded" — 19.7% of the body
+ * attributed to zero elapsed time. Across body sizes the progress-derived rate
+ * overstated the wall-clock rate by 1.26x at 4 MB, 1.44x at 1 MB and 9.2x at
+ * 256 KB, and at the 64 KB chunk this controller starts from it produced a
+ * single event and a zero-width window — no rate at all.
+ *
+ * Running the previous implementation against confirmed-byte accounting on the
+ * same link, back to back, three times:
+ *
+ *     progress-derived   41.06   24.32   11.11 Mbps   spread 117% of mean
+ *     confirmed bytes    12.68   20.88   14.46 Mbps   spread  51% of mean
+ *
+ * The first run reported 3.24x the throughput the link demonstrably sustained.
+ * Note that run 3 came out LOWER than the confirmed figure — so this was never a
+ * fixable constant bias, it was noise driven by which progress events happened
+ * to land inside the trimmed buckets. The confirmed-byte figure is both honest
+ * and materially more repeatable, which is the whole argument for it.
+ *
+ * WHAT IS COUNTED
+ * A POST's bytes join the total only when the server answers 2xx for it. Bytes
+ * still in flight when the window closes are counted by neither the numerator
+ * nor the denominator: the measured span ends at the last confirmation.
+ * Requests that fail, are refused, or are aborted contribute nothing.
+ *
+ * This is deliberately the PESSIMISTIC direction. The figure charges each POST
+ * for its response round trip, so a real uplink is at least this fast and never
+ * slower. On a measurement people use to judge what they are paying for, an
+ * error that under-reports is the only kind worth having.
+ *
+ * `onprogress` is still used — but only to drive the live tile, which has to
+ * react within a second and is explicitly not the recorded result.
+ *
+ * @param {(mbps: number, fraction: number) => void} [onProgress] live only
  * @param {AbortSignal} [signal]
  * @param {import("./endpoints.js").Endpoint} [endpoint]
  * @param {number} [downMbps] measured download, used to seed the first chunk
- * @returns {Promise<number>} Mbps
+ * @returns {Promise<ThroughputResult>}
  */
 export async function measureUpload(onProgress, signal, endpoint = cloudflareEndpoint, downMbps = 0) {
   // Chunk size adapts to the link. A fixed 4 MB chunk was the single worst
   // stall in the whole test: on a 5 Mbps uplink one chunk takes ~6s, four
   // streams put 16 MB in flight, and because a POST cannot be interrupted
-  // between bytes the run overshot its 2.5s window by twenty seconds. Starting
-  // small keeps every POST short enough to react to the deadline, and doubling
-  // on fast round trips still saturates a gigabit uplink within the window.
-  // 64 KB rather than 256 KB: at 1 Mbps a 256 KB chunk needs two seconds and
-  // never finished inside the window, which is how every slow uplink ended up
-  // reporting the same fabricated 0.8 Mbps. 64 KB completes in about half a
-  // second there, and the doubling below still reaches a saturating chunk size
-  // on a fast link within the same window.
+  // between bytes the run overshot its window by twenty seconds. Starting small
+  // keeps every POST short enough to react to the deadline, and the controller
+  // below still reaches a saturating chunk size on a fast link inside it.
   const MIN_CHUNK = 64_000;
   const MAX_CHUNK = 8_000_000;
   const TARGET_POST_MS = 700;
-  // Time for the router's queue to drain after the download phase.
-  const SETTLE_MS = 400;
-  // If not one chunk has completed when the window closes, allow a little
-  // longer rather than giving up: one real chunk beats a fabricated rate. Kept
-  // short, because this extension is time the user spends watching a spinner.
-  const GRACE_MS = 2000;
+  const SETTLE_MS = UPLOAD_SETTLE_MS;
 
   const payload = randomPayload(MAX_CHUNK);
 
   // The download that just finished leaves the router's queue full, and an
   // upload started into that measures the tail of the download rather than the
   // uplink: instrumenting a real run showed 64 KB posts taking 621ms where the
-  // same posts took 86ms on a settled link. A brief pause costs a fraction of a
-  // second and is the difference between measuring the uplink and measuring
-  // congestion this test caused itself.
+  // same posts took 86ms on a settled link.
   //
   // Deliberately a fixed wait, and deliberately short. An adaptive version that
   // probed until the uplink stopped improving was built and then removed: a
   // sweep of settle delays on a real link measured 40.8 Mbps with no extra wait
   // against 0.4 Mbps after waiting two seconds more, so waiting longer was not
-  // merely useless but actively worse. The probes also pushed more data at an
-  // endpoint that turned out to throttle sustained uploads, making the very
-  // problem worse that they were meant to diagnose.
+  // merely useless but actively worse.
   await sleep(SETTLE_MS, signal);
 
   const t0 = performance.now();
 
   // Seed the chunk from what the download already told us instead of starting
-  // blind at the floor. Uplinks are typically a fraction of the downlink, so a
-  // tenth is a deliberately conservative first guess; the controller corrects
-  // within a request or two.
-  //
-  // Divided by the stream count, because UP_STREAMS requests are in flight at
-  // once and they share the uplink — each gets its share, not all of it. Sizing
-  // every chunk for the whole link made each request take UP_STREAMS times
-  // longer than intended, and on a slow uplink that overshot the window so
-  // nothing completed and the phase failed outright. The trigger was perverse:
-  // a FASTER download produced a bigger seed, so measuring a good downlink is
-  // what broke the upload.
+  // blind at the floor. Divided by the stream count, because UP_STREAMS requests
+  // share the uplink — each gets its share, not all of it.
   const seed = downMbps > 0 ? ((downMbps / 10) * 125 * TARGET_POST_MS) / UP_STREAMS : 0;
   let chunk = Math.min(MAX_CHUNK, Math.max(MIN_CHUNK, Math.round(seed) || MIN_CHUNK));
 
-  // Bytes transmitted, accumulated exactly as the download accumulates received
-  // bytes: one counter, stamped on every progress event, bucketed by wall clock.
-  // Upload and download now share an estimator instead of each having their own.
-  let total = 0;
-  let warmupBytes = 0;
+  /** Bytes in POSTs the server answered 2xx for. The measurement. */
+  let confirmedBytes = 0;
+  /** Bytes confirmed before the warm-up cutoff, excluded from the window. */
+  let warmupConfirmed = 0;
   let warmupDone = false;
-  /** @type {number[]} */
-  const buckets = [];
-  let bucketBytes = 0;
-  let bucketStart = 0;
-  /** Set once any byte has been reported, so a dead uplink is distinguishable. */
-  let sawBytes = false;
+  /** Phase-relative time of the most recent confirmation. Ends the window. */
+  let lastConfirmAt = 0;
+  /** Phase-relative time of the first confirmation after warm-up. Starts it. */
+  let firstMeasuredAt = 0;
+  /**
+   * Every confirmed POST, for the trace and for sample-count validation.
+   *
+   * @type {Array<{ bytes: number, ms: number, at: number }>}
+   */
+  const posts = [];
+
+  /** Bytes the socket accepted. Drives the live tile ONLY — never the result. */
+  let liveBytes = 0;
   const liveRate = createLiveRate(0);
 
   const internal = new AbortController();
@@ -979,26 +1254,11 @@ export async function measureUpload(onProgress, signal, endpoint = cloudflareEnd
   const timer = setTimeout(stopAll, UPLOAD_MEASURE_MS);
 
   /** @param {number} delta bytes since this stream last reported */
-  const countBytes = (delta) => {
-    sawBytes = true;
-    total += delta;
+  const countLive = (delta) => {
+    liveBytes += delta;
     const elapsed = performance.now() - t0;
-    if (!warmupDone && elapsed >= WARMUP_MS) {
-      warmupBytes = total;
-      warmupDone = true;
-    }
-    if (!warmupDone) return;
-
-    if (!bucketStart) bucketStart = elapsed;
-    bucketBytes += delta;
-    if (elapsed - bucketStart >= BUCKET_MS) {
-      buckets.push(bpsToMbps(bucketBytes, elapsed - bucketStart));
-      bucketBytes = 0;
-      bucketStart = elapsed;
-    }
-
     const live = liveRate(elapsed, delta);
-    if (live !== null) onProgress?.(live, elapsed / UPLOAD_MEASURE_MS);
+    if (live !== null) onProgress?.(live, Math.min(1, elapsed / UPLOAD_MEASURE_MS));
   };
 
   const stream = async () => {
@@ -1008,14 +1268,41 @@ export async function measureUpload(onProgress, signal, endpoint = cloudflareEnd
       await uploadWithProgress(
         bust(endpoint.up(), `${started}`),
         payload.subarray(0, size),
-        countBytes,
+        countLive,
         internal.signal,
       );
+      // Reached only on a 2xx: uploadWithProgress rejects on any other status,
+      // so a 413, a 500 or a captive-portal redirect can never add bytes.
+      const at = performance.now() - t0;
+      const took = Math.max(1, performance.now() - started);
+
+      if (!warmupDone && at >= WARMUP_MS) {
+        warmupConfirmed = confirmedBytes;
+        warmupDone = true;
+      }
+      confirmedBytes += size;
+      lastConfirmAt = at;
+      // The window starts when the first counted POST STARTED, not at the
+      // warm-up cutoff.
+      //
+      // Clamping this to WARMUP_MS was a bias, and one that pointed the wrong
+      // way. The POST that straddles the cutoff has ALL of its bytes counted —
+      // `warmupConfirmed` is snapshotted just above, before this POST is added —
+      // so clamping kept every one of those bytes in the numerator while
+      // deleting the part of their transmission that happened before 500ms from
+      // the denominator. Driven against the repo's own XHR stub at known link
+      // speeds it over-reported by +8.3% at 1 Mbps, +5.2% at 50 and +5.9% at
+      // 100, always positive — which contradicted the promise three paragraphs
+      // above this function that the figure errs low. On a slow enough link
+      // `bytes - measuredBytes` is zero, so the warm-up discard was removing no
+      // bytes at all and only removing time.
+      if (warmupDone && !firstMeasuredAt) firstMeasuredAt = at - took;
+      posts.push({ bytes: size, ms: Math.round(took), at: Math.round(at) });
+
       // Steer the next request toward TARGET_POST_MS using the rate just
       // observed. A proportional step converges in one move; the doubling it
       // replaced overshot to an 8 MB request taking 2.5s, which put most of the
       // window inside a single upload.
-      const took = Math.max(1, performance.now() - started);
       chunk = Math.min(MAX_CHUNK, Math.max(MIN_CHUNK, Math.round((size / took) * TARGET_POST_MS)));
     }
   };
@@ -1029,30 +1316,46 @@ export async function measureUpload(onProgress, signal, endpoint = cloudflareEnd
 
   assertLive(signal);
 
-  // Nothing was transmitted at all. There is no honest number to report: an
+  const elapsed = performance.now() - t0;
+
+  // Not one POST was acknowledged. There is no honest number to report: an
   // earlier version divided a fixed chunk size by the window, which answered
   // 0.82 Mbps for every slow uplink regardless of its actual speed.
-  if (!sawBytes || !total) {
-    throw new Error("Upload too slow to measure — no data completed in time");
+  if (!confirmedBytes) {
+    throw new Error("Upload too slow to measure — no data was acknowledged in time");
   }
 
-  const elapsed = performance.now() - t0;
-  const measured = elapsed - WARMUP_MS;
-  const postWarmupBytes = total - warmupBytes;
+  // Whole-window rate: every confirmed byte over the entire phase. Always the
+  // most conservative reading, because it charges the measurement for the tail
+  // it could not count. Used as the reconciliation figure.
+  const flat = bpsToMbps(confirmedBytes, elapsed);
 
-  // Discarding the warm-up is only valid if something moved after it. When the
-  // uplink is slow enough that everything landed inside the warm-up, the
-  // post-warmup window holds real elapsed time and no bytes, which divides to a
-  // confident 0.0 Mbps for a link that did transmit.
-  if (!warmupDone || measured < MIN_SAMPLE_MS || postWarmupBytes <= 0) {
-    if (elapsed < MIN_SAMPLE_MS) throw new Error("Upload ended too quickly to measure");
-    return bpsToMbps(total, elapsed);
-  }
+  // Discarding the warm-up is only valid if something was confirmed after it.
+  // On an uplink slow enough that every POST landed inside the warm-up, the
+  // post-warmup window holds real elapsed time and no bytes, which would divide
+  // to a confident 0.0 Mbps for a link that did transmit.
+  const measuredBytes = confirmedBytes - warmupConfirmed;
+  const measuredMs = lastConfirmAt - firstMeasuredAt;
+  const usable = warmupDone && measuredBytes > 0 && measuredMs >= MIN_SAMPLE_MS;
 
-  // Trimmed mean of the interval samples, falling back to the flat rate when the
-  // window was too short to produce enough of them.
-  const trimmed = trimmedMean(buckets);
-  return trimmed ?? bpsToMbps(postWarmupBytes, measured);
+  const mbps = usable ? bpsToMbps(measuredBytes, measuredMs) : flat;
+
+  return {
+    mbps,
+    bytes: confirmedBytes,
+    elapsedMs: elapsed,
+    measuredBytes: usable ? measuredBytes : confirmedBytes,
+    measuredMs: usable ? measuredMs : elapsed,
+    // One rate per confirmed POST. Sparse compared with the download's 250ms
+    // buckets — a POST is the smallest unit the peer acknowledges — so it is a
+    // trace of what actually completed rather than of what was buffered.
+    samples: posts.map((p) => bpsToMbps(p.bytes, p.ms)),
+    streams: UP_STREAMS,
+    method: usable ? "confirmed-bytes" : "confirmed-bytes-flat",
+    reconciliationMbps: flat,
+    warmupMs: WARMUP_MS,
+    posts,
+  };
 }
 
 /**
@@ -1120,14 +1423,14 @@ export async function measureDns(signal) {
  *
  * @param {number[]} samples
  * @param {number | null} jitter null when too few probes to know
- * @param {number} loss
+ * @param {number | null} loss null when the latency phase produced nothing
  * @param {number[]} [throughputSamples] per-interval download Mbps
- * @returns {number | null} 0-100, or null when jitter is unknown
+ * @returns {number | null} 0-100, or null when there is nothing to compute from
  */
 export function stabilityFrom(samples, jitter, loss, throughputSamples = []) {
   // Stability is a function of jitter; without one there is nothing to compute,
   // and defaulting jitter to zero would score an unmeasured link as perfect.
-  if (!samples.length || jitter === null) return null;
+  if (!samples.length || jitter === null || loss === null) return null;
 
   // EXACT FORMULA, so the number is auditable:
   //

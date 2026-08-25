@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { installXhrStub, removeXhrStub } from "./xhr-stub.js";
 import {
   MEASURE_MS,
+  UP_STREAMS,
   WARMUP_MS,
   measureDownload,
   measureUpload,
@@ -64,20 +65,34 @@ describe("measureDownload", () => {
       return { ok: true, body: bodyEmitting(16_000_000, 1, 1) };
     });
 
-    const mbps = await measureDownload();
+    const result = await measureDownload();
     // 16 MB in roughly half a second is ~250 Mbps. Anything near a gigabit is
     // the denominator collapsing, not the link.
-    expect(mbps).toBeLessThan(600);
-    expect(mbps).toBeGreaterThan(0);
+    expect(result.mbps).toBeLessThan(600);
+    expect(result.mbps).toBeGreaterThan(0);
+    // The evidence has to come back with the figure, or nothing downstream can
+    // check it.
+    expect(result.bytes).toBeGreaterThan(0);
+    expect(result.elapsedMs).toBeGreaterThan(0);
   }, 20_000);
 
   it("reports a plausible rate for a steady stream", async () => {
     // 1 MB every 10ms across the streams ≈ 800 Mbps per stream; the exact figure
     // depends on scheduling, so this only asserts it lands in a sane band.
     setFetch(async () => ({ ok: true, body: bodyEmitting(100_000, 10) }));
-    const mbps = await measureDownload();
-    expect(mbps).toBeGreaterThan(0);
-    expect(Number.isFinite(mbps)).toBe(true);
+    const result = await measureDownload();
+    expect(result.mbps).toBeGreaterThan(0);
+    expect(Number.isFinite(result.mbps)).toBe(true);
+
+    // Reconciliation: the headline must be recomputable from the bytes and the
+    // span reported beside it. This is the assertion that would catch a bug in
+    // the aggregation itself, which no amount of "is it a plausible number"
+    // checking can.
+    const fromEvidence = (result.measuredBytes * 8) / (result.measuredMs * 1000);
+    expect(Number.isFinite(fromEvidence)).toBe(true);
+    expect(result.reconciliationMbps).toBeGreaterThan(0);
+    // Trimming is allowed to move the figure, but not to another planet.
+    expect(Math.abs(result.mbps - result.reconciliationMbps) / result.reconciliationMbps).toBeLessThan(1);
   }, 20_000);
 
   it("never returns Infinity or NaN when nothing arrives at all", async () => {
@@ -101,11 +116,16 @@ describe("measureUpload", () => {
     // 1 MB/s uplink. fetch could only ever have inferred this from completed
     // requests; upload.onprogress reports it as it happens.
     installXhrStub({ bytesPerMs: 1000 });
-    return measureUpload().then((mbps) => {
+    return measureUpload().then((result) => {
       // 1000 bytes/ms = 8 Mbps per stream, four streams sharing the stub's
       // simulated pipe independently, so the aggregate is around 32 Mbps.
-      expect(mbps).toBeGreaterThan(8);
-      expect(Number.isFinite(mbps)).toBe(true);
+      expect(result.mbps).toBeGreaterThan(8);
+      expect(Number.isFinite(result.mbps)).toBe(true);
+      // Only acknowledged POSTs may contribute.
+      expect(result.method).toMatch(/^confirmed-bytes/);
+      expect(result.bytes).toBeGreaterThan(0);
+      expect(result.posts?.length ?? 0).toBeGreaterThan(0);
+      expect((result.posts ?? []).reduce((sum, p) => sum + p.bytes, 0)).toBe(result.bytes);
     });
   }, 20_000);
 
@@ -113,18 +133,64 @@ describe("measureUpload", () => {
     installXhrStub({ bytesPerMs: 1000 });
     /** @type {number[]} */
     const live = [];
-    const final = await measureUpload((mbps) => live.push(mbps));
+    const result = await measureUpload((mbps) => live.push(mbps));
 
     // The tile must move during the phase, not jump from nothing to the result.
     expect(live.length).toBeGreaterThan(1);
     expect(live.every((v) => Number.isFinite(v) && v > 0)).toBe(true);
-    // And what it converges to must be what is reported.
-    expect(Math.abs((live.at(-1) ?? 0) - final) / final).toBeLessThan(0.5);
   }, 20_000);
+
+  it("derives the result from acknowledged bytes, not from socket-buffer progress", async () => {
+    // The two are deliberately different sources now, and this is the test that
+    // pins that down. `upload.onprogress` reports bytes accepted by the local
+    // socket buffer, which on a real link runs ahead of the peer — measured
+    // against this endpoint it overstated wall-clock throughput by 9.2x on a
+    // 256 KB body. The live tile may use it, because a tile has to react within
+    // a second. The RESULT may not, because it has to be true.
+    installXhrStub({ bytesPerMs: 1000 });
+    /** @type {number[]} */
+    const live = [];
+    const result = await measureUpload((mbps) => live.push(mbps));
+
+    // Every byte in the figure belongs to a POST the server answered for.
+    const acknowledged = (result.posts ?? []).reduce((sum, p) => sum + p.bytes, 0);
+    expect(result.bytes).toBe(acknowledged);
+    // And the figure is that byte count over the span those acknowledgements
+    // happened in — recomputable, to the rounding.
+    const recomputed = (result.measuredBytes * 8) / (result.measuredMs * 1000);
+    expect(Math.abs(recomputed - result.mbps)).toBeLessThan(0.01);
+  }, 20_000);
+
+  it("does not over-report a link of known speed, in either direction", async () => {
+    // The stub transmits at a rate we choose, so the true link speed is known
+    // and the reported figure can be checked for ACCURACY and, more
+    // importantly, for SIGN.
+    //
+    // The sign assertion is the one that matters. This function promises in
+    // its own docstring that it errs low — it charges every POST for its
+    // response round trip, so a real uplink is at least as fast as reported.
+    // A warm-up clamp broke that promise silently: the POST straddling the
+    // 500ms cutoff had all of its bytes counted but only part of its
+    // transmission time, and the figure came out 3-8% HIGH at every link
+    // speed tested. An accuracy-only assertion would have passed throughout.
+    const streams = UP_STREAMS;
+    for (const trueMbps of [2, 50, 200]) {
+      installXhrStub({ bytesPerMs: (trueMbps * 1000) / 8 / streams, progressEveryMs: 50 });
+      const { mbps } = await measureUpload();
+
+      const error = (mbps - trueMbps) / trueMbps;
+      // Close to the truth...
+      expect(Math.abs(error)).toBeLessThan(0.08);
+      // ...and never flattering. A percent of slack for scheduling jitter,
+      // not enough to hide a systematic bias.
+      expect(mbps).toBeLessThanOrEqual(trueMbps * 1.01);
+    }
+  }, 60_000);
 
   it("sends an incompressible body, so compression cannot inflate the result", () => {
     const seen = installXhrStub({ bytesPerMs: 100_000 });
-    return measureUpload().then(() => {
+    return measureUpload().then((result) => {
+      expect(result.mbps).toBeGreaterThan(0);
       const sizes = seen().map((r) => r.bytes);
       expect(sizes.length).toBeGreaterThan(0);
       expect(Math.max(...sizes)).toBeGreaterThan(0);

@@ -25,7 +25,11 @@ export const downloadRoutes =
         : 0;
 
       reply
-        .header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        // `no-transform` is the part that matters for accuracy, not for caching:
+        // it tells intermediaries not to re-encode the body. A proxy that gzips
+        // this stream would have the client count decompressed bytes and report
+        // a decompressor's speed as the link's.
+        .header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0, no-transform")
         .header("Pragma", "no-cache")
         .header("Expires", "0")
         // Explicitly identity-encoded so no proxy re-compresses the stream.

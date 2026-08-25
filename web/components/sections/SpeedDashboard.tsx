@@ -93,10 +93,10 @@ export function SpeedDashboard() {
   const onUpload = phase === "upload";
   const onLatency = phase === "latency";
   const gaugeValue = onLatency
-    ? (result.ping ?? 0)
+    ? (result.ping ?? null)
     : onUpload
-      ? (result.upload ?? 0)
-      : (result.download ?? 0);
+      ? (result.upload ?? null)
+      : (result.download ?? null);
   const gaugeUnit = onLatency ? "ms" : "Mbps";
 
   /* Sparklines come from the engine's own sample buffer — the exact values the
@@ -323,7 +323,10 @@ export function SpeedDashboard() {
                   ].map(([label, val]) => (
                     <div key={label as string}>
                       <p className="tabular font-display text-base font-extrabold leading-none">
-                        {val}
+                        {/* Every percentile is nullable: a latency phase that failed
+                            has no figures, and rendering null here printed a bare
+                            "ms" beside nothing. */}
+                        {val ?? "—"}
                         <span className="ms-0.5 text-[0.5rem] font-semibold text-[color:var(--page-fg-muted)]">
                           ms
                         </span>

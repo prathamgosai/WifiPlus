@@ -29,8 +29,11 @@ import {
   measureUpload,
   stabilityFrom,
   withFailover,
+  UPLOAD_MEASURE_MS,
+  UPLOAD_SETTLE_MS,
 } from "./measure.js";
 import { endpointLabel, resolveEndpoint } from "./server-picker.js";
+import { measurementQuality } from "./quality.js";
 
 /**
  * @typedef {import("./endpoints.js").Endpoint} Endpoint
@@ -74,13 +77,19 @@ export const PROGRESS = { latency: 22, download: 62, upload: 100 };
  *   distribution, once the phase completes.
  * @property {(bloat: BufferbloatResult | null) => void} [onBufferbloat] Null
  *   when too few probes survived the saturated link to judge it.
+ * @property {(bloat: BufferbloatResult | null) => void} [onUploadBufferbloat]
+ *   The same measurement taken while the link is saturated UPSTREAM.
  */
 
 /**
  * @typedef {object} RunOutcome
  * @property {SpeedResult} result
  * @property {LatencyResult} latency
- * @property {BufferbloatResult | null} bufferbloat
+ * @property {BufferbloatResult | null} bufferbloat The worse of the two below.
+ * @property {BufferbloatResult | null} downloadBloat Latency added under download load.
+ * @property {BufferbloatResult | null} uploadBloat Latency added under upload load.
+ * @property {import("./quality.js").QualityReport} quality
+ * @property {object} evidence The bytes, spans and sample counts behind the result.
  * @property {Endpoint} endpoint The edge that actually served the run, which
  *   after a fallback is not the one selected at the start.
  * @property {string} edgeLabel
@@ -99,9 +108,13 @@ export const PROGRESS = { latency: 22, download: 62, upload: 100 };
  *
  * @param {RunHandlers} [handlers]
  * @param {AbortSignal} [signal]
+ * @param {{ hiddenDuringRun?: boolean, wentOffline?: boolean }} [environment]
+ *   Facts about the conditions the run happened under, which the engine cannot
+ *   observe for itself from inside a worker. They cannot change a number — only
+ *   the confidence attached to it.
  * @returns {Promise<RunOutcome>}
  */
-export async function runMeasurement(handlers = {}, signal) {
+export async function runMeasurement(handlers = {}, signal, environment) {
   const {
     onPhase,
     onProgress,
@@ -113,6 +126,7 @@ export async function runMeasurement(handlers = {}, signal) {
     onUploadSample,
     onLatencyDetail,
     onBufferbloat,
+    onUploadBufferbloat,
   } = handlers;
 
   // ---- Edge selection ------------------------------------------------- 0%
@@ -163,7 +177,16 @@ export async function runMeasurement(handlers = {}, signal) {
   const dnsPromise = measureDns(signal).catch(() => null);
 
   const [latencyRes, dnsRes] = await Promise.allSettled([latencyPromise, dnsPromise]);
-  const latency = latencyRes.status === "fulfilled" ? latencyRes.value : { ping: null, jitter: null, loss: null, min: 0, max: 0, p95: 0, variance: 0, samples: [] };
+  // A latency phase that FAILED has no readings, and the shape it degrades to
+  // is the whole honesty of the run. Substituting zeros — which this did —
+  // published ping 0 ms, jitter 0 ms and 0% loss with a measured badge on a
+  // connection that was offline, because 0 is a finite number and every gate
+  // downstream asks only whether the value is finite. Nulls make the same code
+  // paths report unavailable, which is what actually happened.
+  const latency =
+    latencyRes.status === "fulfilled"
+      ? latencyRes.value
+      : { ping: null, jitter: null, loss: null, min: null, max: null, p95: null, variance: null, samples: [] };
   const dns = dnsRes.status === "fulfilled" ? dnsRes.value : null;
 
   onLatencyDetail?.(latency);
@@ -192,21 +215,53 @@ export async function runMeasurement(handlers = {}, signal) {
 
   const [downRes, loadedProbesRes] = await Promise.allSettled([downloadPromise, loadedProbesPromise]);
   if (downRes.status === "rejected") throw downRes.reason;
+  /** @type {import("./measure.js").ThroughputResult} */
   const down = downRes.value;
   const loadedProbes = loadedProbesRes.status === "fulfilled" ? loadedProbesRes.value : [];
 
-  onMetric?.({ download: round1(down) });
-  const bufferbloat = bufferbloatFrom(latency.ping || 0, loadedProbes);
-  onBufferbloat?.(bufferbloat);
+  onMetric?.({ download: round1(down.mbps) });
+  // Bufferbloat is the difference between idle and loaded latency, so with no
+  // idle figure there is no difference to state.
+  const downloadBloat = latency.ping === null ? null : bufferbloatFrom(latency.ping, loadedProbes);
+  onBufferbloat?.(downloadBloat);
 
-  // ---- Upload ------------------------------------------------------ 62-100%
+  // ---- Upload, with latency probed under it ------------------------ 62-100%
+  //
+  // Latency under UPLOAD load is a separate measurement from latency under
+  // download load and frequently the worse of the two: consumer links are
+  // asymmetric, so the upstream queue is the one that fills first and the one
+  // that breaks a video call while someone is backing up photos. Measuring only
+  // the download side reported an A to connections that stutter every time they
+  // send. The probe adds no traffic of its own — the upload phase is already
+  // saturating the link, which is exactly the condition being measured.
   onPhase?.("upload");
-  /** @type {number | null} */
+  /** @type {import("./measure.js").ThroughputResult | null} */
   let upload = null;
   /** @type {string | null} */
   let uploadNote = null;
+  /** @type {number[]} */
+  let uploadLoadedProbes = [];
+
+  // The window covers the upload's own settle pause as well as its measured
+  // window, and the probe waits out both before its first sample — otherwise
+  // the opening probes measure an idle link and are averaged into a grade about
+  // a saturated one.
+  // Flipped the moment the upload settles, however it settles. Without it a
+  // failed upload — which returns almost instantly — left the probe running out
+  // its full window against an idle link, adding eight seconds of dead time to
+  // the run AND feeding idle samples into a grade about a saturated one.
+  let uploadFinished = false;
+  const uploadLoadedPromise = measureLoadedLatency(
+    undefined,
+    signal,
+    servedBy,
+    UPLOAD_MEASURE_MS + UPLOAD_SETTLE_MS,
+    UPLOAD_SETTLE_MS + 350,
+    () => uploadFinished,
+  ).catch(() => []);
+
   try {
-    const up = await runPhase((endpoint) =>
+    upload = await runPhase((endpoint) =>
       measureUpload(
         (mbps, fraction) => {
           onUploadSample?.(mbps, fraction);
@@ -219,18 +274,28 @@ export async function runMeasurement(handlers = {}, signal) {
         endpoint,
         // The download is already known, so the upload starts from a chunk near
         // the right size instead of ramping from the floor inside its window.
-        down,
+        down.mbps,
       ),
     );
-    upload = round1(up);
   } catch (error) {
     // Cancellation is the user's decision and must propagate. Anything else
     // means this one metric has no honest value, which is not a reason to throw
     // away six that do.
-    if (error instanceof TestAborted) throw error;
+    if (error instanceof TestAborted) {
+      uploadFinished = true;
+      throw error;
+    }
     uploadNote = /** @type {Error} */ (error).message;
+  } finally {
+    uploadFinished = true;
   }
-  onMetric?.({ upload });
+
+  uploadLoadedProbes = await uploadLoadedPromise;
+  const uploadBloat =
+    latency.ping === null ? null : bufferbloatFrom(latency.ping, uploadLoadedProbes);
+  onUploadBufferbloat?.(uploadBloat);
+
+  onMetric?.({ upload: upload ? round1(upload.mbps) : null });
 
   // Stability from the observed latency spread — never a random number.
   const stability = stabilityFrom(latency.samples, latency.jitter, latency.loss, throughputSamples);
@@ -239,10 +304,34 @@ export async function runMeasurement(handlers = {}, signal) {
   onProgress?.(PROGRESS.upload);
   onPhase?.("done");
 
+  // The grade the run gives itself. Computed here rather than in a front end so
+  // both shells report the same confidence from the same evidence, and so a
+  // result carried in a link can be re-checked against the record it came with.
+  const quality = measurementQuality({
+    download: down,
+    upload,
+    latencySamples: latency.samples.length,
+    loadedProbes: loadedProbes.length,
+    completed: true,
+    endpointChanged: servedBy !== choice.endpoint,
+    hiddenDuringRun: environment?.hiddenDuringRun ?? false,
+    wentOffline: environment?.wentOffline ?? false,
+    // The picker already measured this edge health; carrying it into the
+    // grade is what lets a run say "the server was busy" instead of reporting
+    // the server capacity as the connection speed.
+    ...(typeof choice.ranked?.[0]?.load === "number" ? { serverLoad: choice.ranked[0].load } : {}),
+  });
+
+  // The worse of the two grades is the one that describes the connection. A
+  // link that holds up while downloading and collapses while uploading is a
+  // link that collapses under load, and reporting the download side alone would
+  // hand it the grade it earned in the easier direction.
+  const bufferbloat = worseBloat(downloadBloat, uploadBloat);
+
   return {
     result: {
-      download: round1(down),
-      upload,
+      download: round1(down.mbps),
+      upload: upload ? round1(upload.mbps) : null,
       ping: latency.ping,
       jitter: latency.jitter,
       loss: latency.loss,
@@ -251,10 +340,38 @@ export async function runMeasurement(handlers = {}, signal) {
     },
     latency,
     bufferbloat,
+    downloadBloat,
+    uploadBloat,
+    quality,
+    // The evidence every figure above was derived from, carried out of the
+    // engine rather than discarded at its edge. Without it nothing downstream
+    // can check the headline, which is the whole reason a result can claim to
+    // be verified at all.
+    evidence: {
+      download: down,
+      upload,
+      idleProbes: latency.samples.length,
+      downloadLoadedProbes: loadedProbes.length,
+      uploadLoadedProbes: uploadLoadedProbes.length,
+      protocol: down.protocol ?? null,
+    },
     endpoint: servedBy,
     edgeLabel: servedBy === choice.endpoint ? endpointLabel(choice) : servedBy.name,
     uploadNote,
   };
+}
+
+/**
+ * The worse of two bufferbloat grades, or whichever one exists.
+ *
+ * @param {import("./measure.js").BufferbloatResult | null} a
+ * @param {import("./measure.js").BufferbloatResult | null} b
+ * @returns {import("./measure.js").BufferbloatResult | null}
+ */
+function worseBloat(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return b.increase > a.increase ? b : a;
 }
 
 /** @param {number} value @returns {number} */

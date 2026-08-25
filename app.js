@@ -6,7 +6,7 @@
  * DOM layer for that engine: rendering, wiring and page state. Anything that
  * computes a number belongs in core, so the two front ends can never disagree.
  */
-import { BASE_STOPS, fractionFor, labelFor, needleAngle, pointOnArc } from "./core/gauge.js";
+import { BASE_STOPS, fractionFor, labelFor, needleAngle, pointOnArc, scaleFor } from "./core/gauge.js";
 import {
   BADGE_TEXT,
   METRIC_KEYS,
@@ -21,6 +21,23 @@ import { bufferbloatVerdict, healthVerdict, qualityScores } from "./core/scoring
 import { clearHistory, downloadDelta, loadHistory, saveHistoryEntry } from "./core/history.js";
 import { resultFromHash, resultLink } from "./core/permalink.js";
 import { generateAiDiagnosis } from "./core/ai-doctor.js";
+import { healthBand } from "./core/health.js";
+// The report renderers are imported eagerly and the 3D scene is not: the report
+// has to be ready the instant the latency phase ends (a module fetch mid-run
+// would be measured by the run), while the scene is decoration that must never
+// be on the critical path.
+import {
+  renderBufferbloat as paintBufferbloat,
+  renderDoctor,
+  renderHealth,
+  renderHistory as paintHistory,
+  renderPath,
+  renderQuality,
+  renderTechnical,
+  resetReport,
+  revealReport,
+} from "./ui/report.js";
+import { renderLatencyChart } from "./ui/latency-chart.js";
 
 const qs = (selector) => document.querySelector(selector);
 const qsa = (selector) => Array.from(document.querySelectorAll(selector));
@@ -37,32 +54,380 @@ const state = {
   stability: null,
   health: null,
   network: null,
+  bufferbloat: null,
+  // Provenance for the report: which edge served the run, and whether anything
+  // about the run itself makes its numbers less trustworthy.
+  edgeLabel: null,
+  degraded: false,
+  // The run's own assessment and the evidence behind it. Held on state so the
+  // technical drawer, the exported JSON and the verdict pill all read the same
+  // record rather than each reconstructing one.
+  quality: null,
+  evidence: null,
+  downloadBloat: null,
+  uploadBloat: null,
+  uploadNote: null,
   scopedGlobal: false,
   ranking: "world"
 };
 
 let activeTestController = null;
 
+/**
+ * Interface copy.
+ * -----------------------------------------------------------------------------
+ * English is the source of truth and every other language falls back to it key
+ * by key, so a partially translated locale shows translated strings where they
+ * exist and correct English where they do not — never a raw key, and never a
+ * layout broken by a missing string.
+ *
+ * Nothing that states a MEASUREMENT is translated by string substitution: the
+ * numbers, units and badge states are formatted from the data, so a translation
+ * cannot accidentally change what the page claims was measured.
+ */
+const EN = {
+  // Navigation
+  navSpeedTest: "Speed Test",
+  navAnalyzer: "WiFi Analyzer",
+  navPing: "Ping",
+  navIsp: "ISP Intelligence",
+  navTools: "Tools",
+
+  // Hero
+  eyebrow: "Real-time internet intelligence",
+  heroTitle: "Test your <em>internet</em>.",
+  heroCopy: "Measure real-world download, upload, latency and stability from your browser.",
+  startTest: "Start test",
+  startSub: "Measure your connection",
+  testing: "Testing…",
+  testAgain: "Test again",
+  stopTest: "Stop test",
+  seeReport: "See full report",
+  trust1: "No signup",
+  trust2: "No ads",
+  trust3: "Every figure measured or marked unavailable",
+  trust4: "History stays on this device",
+
+  // Dial
+  dialReady: "Ready",
+  dialNote: "About 12 seconds of real data transfer.",
+  phaseFinding: "Finding edge",
+  phasePing: "Ping",
+  phaseDownload: "Download",
+  phaseUpload: "Upload",
+  noteFinding: "Choosing the closest measurement edge by round-trip time.",
+  noteDone: "Measured end to end, from this browser to the edge.",
+
+  // Phase copy
+  copySelect: "Selecting the nearest measurement edge by latency…",
+  copyLatency: "Measuring ping, jitter, percentiles, packet loss and DNS…",
+  copyDownload: "Measuring download throughput and latency under load…",
+  copyUpload: "Measuring upload throughput…",
+  noteSelect: "Choosing the closest measurement edge by round-trip time.",
+  noteLatency: "Probing round-trip time, and watching the tail.",
+  noteDownload: "Eight parallel streams, six-second window.",
+  noteUpload: "Four parallel streams, four-second window.",
+
+  // Status
+  statusReady:
+    "Ready. About 12 seconds: latency probing with percentiles and probe loss, a 6-second download window, a 4-second upload window, plus DNS and latency under load.",
+  statusStarting: "Starting the measurement engine…",
+  statusCancelled: "Test cancelled. No result was recorded — press Start to run a fresh measurement.",
+
+  // Connection strip
+  provider: "Provider",
+  yourAddress: "Your address",
+  measurementEdge: "Measurement edge",
+  client: "Client",
+  noAppNoAds: "No app, no ads, no signup",
+
+  // Metrics
+  download: "Download",
+  upload: "Upload",
+  ping: "Ping",
+  jitter: "Jitter",
+  dnsLatency: "DNS latency",
+  stability: "Stability",
+  loadedLatency: "Loaded latency",
+  bufferbloat: "Bufferbloat",
+
+  // Report
+  yourResult: "Your result",
+  connectionReport: "Connection report",
+  downloadCardBtn: "Download result card",
+  shareBtn: "Share",
+  copyLinkBtn: "Copy link",
+  copyJsonBtn: "Copy JSON",
+  howScored: "How this score is calculated",
+  gaming: "Gaming",
+  streaming: "4K streaming",
+  videoCalls: "Video calls",
+  workFromHome: "Work from home",
+  latencyDistribution: "Latency distribution",
+  min: "Min",
+  median: "Median",
+  max: "Max",
+  bufferbloatTitle: "Latency under load · bufferbloat",
+  idleLatency: "Idle latency",
+  addedUnderLoad: "Added under load",
+  technicalDetails: "Technical details",
+  networkPath: "Where the bottleneck probably is",
+  hopDevice: "This device",
+  hopWifi: "WiFi link",
+  hopRouter: "Router",
+  hopIsp: "ISP",
+  hopEdge: "Measurement edge",
+  networkDoctor: "Your network doctor",
+  advancedDiagnostics: "Advanced diagnostics",
+  historyTitle: "Your history · this device only",
+  clear: "Clear",
+  whatThisMeasures: "What this test actually measures",
+  measurementQuality: "Measurement quality",
+  technicalDetailsTitle: "Technical details of this measurement",
+  technicalDetailsNote:
+    "Everything the engine recorded, so any figure above can be recomputed from the bytes and probes behind it rather than taken on trust.",
+  p95Note:
+    "The p95 tail is what you actually feel on a call. An average hides it — five percent of packets arriving late is enough to break audio.",
+  pathNote:
+    "This is an interpretation of the measurement, not a traceroute. A web page cannot see inside your router or isolate the WiFi hop on its own — a hop is flagged when the numbers are consistent with a problem there, and left neutral when they are not. To confirm WiFi is the bottleneck, run this once over WiFi and once on an Ethernet cable to the same router, and compare.",
+  doctorNote:
+    "Generated on this device from your own measurement using fixed rules — no data leaves your browser, and the same numbers always produce the same advice.",
+  historyNote:
+    "Stored in this browser only. It is never uploaded, and clearing it here deletes it for good.",
+  methodScopeTitle: "Scope",
+  methodMeasuredTitle: "Measured, and cross-checked",
+  methodCannotTitle: "What a browser cannot do",
+  methodDataTitle: "Data used",
+  methodVaryTitle: "Why results vary",
+  methodGradeTitle: "How this run graded itself",
+  methodFullTitle: "The full method",
+  methodPrivacyTitle: "Privacy",
+};
+
+/**
+ * Overrides only. A key absent here falls through to English, which is why a
+ * language can ship the twenty strings that matter most without shipping a
+ * half-translated report underneath them.
+ */
 const translations = {
-  en: { heroTitle: "WifiPlus — test your internet speed anywhere on Earth", heroCopy: "WifiPlus measures speed, latency, DNS response, packet loss, and WiFi health, then compares results against providers in every major global region.", startTest: "Start Global Test" },
-  hi: { heroTitle: "दुनिया में कहीं भी इंटरनेट स्पीड टेस्ट करें", heroCopy: "WifiPlus स्पीड, लेटेंसी, DNS, पैकेट लॉस और WiFi हेल्थ मापता है और परिणामों की तुलना वैश्विक प्रदाताओं से करता है.", startTest: "ग्लोबल टेस्ट शुरू करें" },
-  ar: { heroTitle: "اختبر سرعة الإنترنت في أي مكان في العالم", heroCopy: "يقيس WifiPlus السرعة وزمن الاستجابة وDNS وفقدان الحزم وصحة WiFi ثم يقارن النتائج بمزودي الخدمة عالميًا.", startTest: "ابدأ الاختبار العالمي" },
-  es: { heroTitle: "Prueba tu velocidad de internet en cualquier lugar", heroCopy: "WifiPlus mide velocidad, latencia, DNS, pérdida de paquetes y salud WiFi, y compara resultados con proveedores globales.", startTest: "Iniciar prueba global" },
-  fr: { heroTitle: "Testez votre débit internet partout dans le monde", heroCopy: "WifiPlus mesure débit, latence, DNS, perte de paquets et santé WiFi, puis compare les résultats aux fournisseurs mondiaux.", startTest: "Lancer le test global" },
-  de: { heroTitle: "Teste deine Internetgeschwindigkeit weltweit", heroCopy: "WifiPlus misst Geschwindigkeit, Latenz, DNS, Paketverlust und WiFi-Zustand und vergleicht Ergebnisse mit globalen Anbietern.", startTest: "Globalen Test starten" },
-  pt: { heroTitle: "Teste sua internet em qualquer lugar do mundo", heroCopy: "WifiPlus mede velocidade, latência, DNS, perda de pacotes e saúde do WiFi, comparando resultados com provedores globais.", startTest: "Iniciar teste global" },
-  zh: { heroTitle: "在全球任何地方测试网速", heroCopy: "WifiPlus 测量速度、延迟、DNS、丢包和 WiFi 健康，并与全球主要运营商对比。", startTest: "开始全球测试" },
-  ja: { heroTitle: "世界中どこでもインターネット速度を測定", heroCopy: "WifiPlus は速度、遅延、DNS、パケット損失、WiFi 健康度を測定し、世界のプロバイダーと比較します。", startTest: "グローバルテスト開始" },
-  ko: { heroTitle: "전 세계 어디서나 인터넷 속도 테스트", heroCopy: "WifiPlus는 속도, 지연, DNS, 패킷 손실, WiFi 상태를 측정하고 글로벌 제공업체와 비교합니다.", startTest: "글로벌 테스트 시작" },
-  ru: { heroTitle: "Проверьте скорость интернета в любой стране", heroCopy: "WifiPlus измеряет скорость, задержку, DNS, потери пакетов и состояние WiFi, сравнивая результаты с мировыми провайдерами.", startTest: "Начать глобальный тест" },
-  tr: { heroTitle: "Dunyanin her yerinde internet hizini test edin", heroCopy: "WifiPlus hiz, gecikme, DNS, paket kaybi ve WiFi sagligini olcer, sonuclari kuresel saglayicilarla karsilastirir.", startTest: "Global testi baslat" },
-  id: { heroTitle: "Uji kecepatan internet di mana saja", heroCopy: "WifiPlus mengukur kecepatan, latensi, DNS, packet loss, dan kesehatan WiFi, lalu membandingkan hasil dengan penyedia global.", startTest: "Mulai tes global" },
-  bn: { heroTitle: "বিশ্বের যেকোনো জায়গায় ইন্টারনেট স্পিড টেস্ট করুন", heroCopy: "WifiPlus স্পিড, লেটেন্সি, DNS, প্যাকেট লস এবং WiFi স্বাস্থ্য মাপে এবং ফলাফল বিশ্বব্যাপী প্রদানকারীদের সঙ্গে তুলনা করে।", startTest: "গ্লোবাল টেস্ট শুরু করুন" },
-  ur: { heroTitle: "دنیا میں کہیں بھی انٹرنیٹ اسپیڈ ٹیسٹ کریں", heroCopy: "WifiPlus رفتار، تاخیر، DNS، پیکٹ لاس اور WiFi صحت ناپتا ہے اور نتائج کا عالمی فراہم کنندگان سے موازنہ کرتا ہے۔", startTest: "گلوبل ٹیسٹ شروع کریں" }
+  en: EN,
+  hi: {
+    navSpeedTest: "स्पीड टेस्ट",
+    navAnalyzer: "वाईफाई एनालाइज़र",
+    navPing: "पिंग",
+    navIsp: "ISP इंटेलिजेंस",
+    navTools: "टूल्स",
+    eyebrow: "रीयल-टाइम इंटरनेट इंटेलिजेंस",
+    heroTitle: "अपना <em>इंटरनेट</em> जांचें।",
+    heroCopy: "अपने ब्राउज़र से डाउनलोड, अपलोड, लेटेंसी और स्थिरता को वास्तविक रूप से मापें — हर आंकड़ा या तो मापा गया है या अनुपलब्ध बताया गया है।",
+    startTest: "टेस्ट शुरू करें",
+    startSub: "अपना कनेक्शन मापें",
+    testing: "जाँच हो रही है…",
+    testAgain: "फिर से जांचें",
+    stopTest: "रोकें",
+    seeReport: "पूरी रिपोर्ट देखें",
+    trust1: "साइनअप नहीं",
+    trust2: "विज्ञापन नहीं",
+    trust3: "वास्तविक मापे गए बाइट्स",
+    trust4: "इतिहास इसी डिवाइस पर",
+    dialReady: "तैयार",
+    dialNote: "लगभग 12 सेकंड का वास्तविक डेटा ट्रांसफर।",
+    phasePing: "पिंग",
+    phaseDownload: "डाउनलोड",
+    phaseUpload: "अपलोड",
+    download: "डाउनलोड",
+    upload: "अपलोड",
+    ping: "पिंग",
+    jitter: "जिटर",
+    yourResult: "आपका परिणाम",
+    connectionReport: "कनेक्शन रिपोर्ट",
+    gaming: "गेमिंग",
+    streaming: "4K स्ट्रीमिंग",
+    videoCalls: "वीडियो कॉल",
+    workFromHome: "घर से काम",
+    clear: "साफ़ करें",
+  },
+  es: {
+    navSpeedTest: "Test de velocidad",
+    navAnalyzer: "Analizador WiFi",
+    navPing: "Ping",
+    navIsp: "Inteligencia ISP",
+    navTools: "Herramientas",
+    eyebrow: "Inteligencia de internet en tiempo real",
+    heroTitle: "Prueba tu <em>internet</em>.",
+    heroCopy: "Mide descarga, subida, latencia y estabilidad reales desde tu navegador — cada cifra es medida o se marca como no disponible.",
+    startTest: "Iniciar prueba",
+    startSub: "Mide tu conexión",
+    testing: "Midiendo…",
+    testAgain: "Repetir",
+    stopTest: "Detener",
+    seeReport: "Ver informe completo",
+    trust1: "Sin registro",
+    trust2: "Sin anuncios",
+    trust3: "Bytes realmente medidos",
+    trust4: "El historial no sale de este dispositivo",
+    dialReady: "Listo",
+    dialNote: "Unos 12 segundos de transferencia real.",
+    phaseDownload: "Descarga",
+    phaseUpload: "Subida",
+    download: "Descarga",
+    upload: "Subida",
+    jitter: "Jitter",
+    yourResult: "Tu resultado",
+    connectionReport: "Informe de conexión",
+    gaming: "Juegos",
+    streaming: "Streaming 4K",
+    videoCalls: "Videollamadas",
+    workFromHome: "Teletrabajo",
+    clear: "Borrar",
+  },
+  ar: {
+    eyebrow: "ذكاء إنترنت فوري",
+    heroTitle: "اختبر <em>إنترنتك</em>.",
+    heroCopy: "قِس سرعة التنزيل والرفع وزمن الاستجابة والاستقرار فعليًا من متصفحك.",
+    startTest: "ابدأ الاختبار",
+    startSub: "قِس اتصالك",
+    testing: "جارٍ القياس…",
+    testAgain: "أعد الاختبار",
+    stopTest: "إيقاف",
+    download: "التنزيل",
+    upload: "الرفع",
+    ping: "زمن الاستجابة",
+    jitter: "التذبذب",
+    yourResult: "نتيجتك",
+    connectionReport: "تقرير الاتصال",
+  },
+  fr: {
+    eyebrow: "Intelligence internet en temps réel",
+    heroTitle: "Testez votre <em>connexion</em>.",
+    heroCopy: "Mesurez le débit descendant, montant, la latence et la stabilité réels depuis votre navigateur.",
+    startTest: "Lancer le test",
+    startSub: "Mesurer votre connexion",
+    testing: "Mesure…",
+    testAgain: "Relancer",
+    stopTest: "Arrêter",
+    download: "Descendant",
+    upload: "Montant",
+    jitter: "Gigue",
+    yourResult: "Votre résultat",
+    connectionReport: "Rapport de connexion",
+  },
+  de: {
+    eyebrow: "Echtzeit-Internetanalyse",
+    heroTitle: "Teste dein <em>Internet</em>.",
+    heroCopy: "Miss echten Download, Upload, Latenz und Stabilität direkt im Browser.",
+    startTest: "Test starten",
+    startSub: "Verbindung messen",
+    testing: "Messung…",
+    testAgain: "Erneut testen",
+    stopTest: "Stoppen",
+    jitter: "Jitter",
+    yourResult: "Dein Ergebnis",
+    connectionReport: "Verbindungsbericht",
+  },
+  pt: {
+    eyebrow: "Inteligência de internet em tempo real",
+    heroTitle: "Teste sua <em>internet</em>.",
+    heroCopy: "Meça download, upload, latência e estabilidade reais pelo navegador.",
+    startTest: "Iniciar teste",
+    startSub: "Medir sua conexão",
+    testing: "Medindo…",
+    testAgain: "Testar de novo",
+    stopTest: "Parar",
+    download: "Download",
+    upload: "Upload",
+    yourResult: "Seu resultado",
+    connectionReport: "Relatório de conexão",
+  },
+  zh: {
+    eyebrow: "实时网络智能",
+    heroTitle: "测试你的<em>网络</em>。",
+    heroCopy: "在浏览器中真实测量下载、上传、延迟与稳定性。",
+    startTest: "开始测试",
+    startSub: "测量你的连接",
+    testing: "测试中…",
+    testAgain: "再测一次",
+    stopTest: "停止",
+    download: "下载",
+    upload: "上传",
+    ping: "延迟",
+    jitter: "抖动",
+    yourResult: "你的结果",
+    connectionReport: "连接报告",
+  },
+  ja: {
+    eyebrow: "リアルタイム回線インテリジェンス",
+    heroTitle: "<em>回線</em>を測る。",
+    heroCopy: "ブラウザから下り・上り速度、遅延、安定性を実測します。",
+    startTest: "テスト開始",
+    startSub: "回線を測定",
+    testing: "測定中…",
+    testAgain: "もう一度",
+    stopTest: "停止",
+    download: "下り",
+    upload: "上り",
+    yourResult: "結果",
+    connectionReport: "回線レポート",
+  },
+  ko: { heroTitle: "당신의 <em>인터넷</em>을 측정하세요.", startTest: "테스트 시작", testing: "측정 중…", testAgain: "다시 측정", stopTest: "중지" },
+  ru: { heroTitle: "Проверьте свой <em>интернет</em>.", startTest: "Начать тест", testing: "Измерение…", testAgain: "Ещё раз", stopTest: "Остановить" },
+  tr: { heroTitle: "<em>Internetini</em> test et.", startTest: "Testi baslat", testing: "Olculuyor…", testAgain: "Tekrar", stopTest: "Durdur" },
+  id: { heroTitle: "Uji <em>internet</em> Anda.", startTest: "Mulai tes", testing: "Mengukur…", testAgain: "Ulangi", stopTest: "Berhenti" },
+  bn: { heroTitle: "আপনার <em>ইন্টারনেট</em> পরীক্ষা করুন।", startTest: "টেস্ট শুরু", testing: "পরিমাপ চলছে…", testAgain: "আবার", stopTest: "থামান" },
+  ur: { heroTitle: "اپنا <em>انٹرنیٹ</em> جانچیں۔", startTest: "ٹیسٹ شروع کریں", testing: "پیمائش…", testAgain: "دوبارہ", stopTest: "روکیں" },
+};
+
+/** The language currently applied, and the lookup every JS string goes through. */
+let activeLanguage = "en";
+
+/**
+ * The translation, or undefined when the interface has nothing to say for this
+ * key. Callers that render into the DOM use this and leave the markup alone
+ * when it answers undefined.
+ *
+ * @param {string} key @returns {string | undefined}
+ */
+function lookup(key) {
+  const table = translations[activeLanguage];
+  if (table && table[key] !== undefined) return table[key];
+  return EN[key];
+}
+
+/**
+ * The translation for a string built in JavaScript, where there is no markup to
+ * fall back to. Returns the key itself only if the English table is missing it,
+ * which is a bug rather than a state to design for.
+ *
+ * @param {string} key @returns {string}
+ */
+function t(key) {
+  return lookup(key) ?? key;
+}
+
+/**
+ * Phase wording lives in the front end, not in the engine: `core/run.js` reports
+ * which phase it is in, and each interface chooses how to say it — in whichever
+ * language is active at the moment the phase changes, which is why these are
+ * getters rather than a frozen table.
+ */
+const PHASE_COPY = {
+  get select() { return t("copySelect"); },
+  get latency() { return t("copyLatency"); },
+  get download() { return t("copyDownload"); },
+  get upload() { return t("copyUpload"); },
+};
+
+const PHASE_NOTE = {
+  get select() { return t("noteSelect"); },
+  get latency() { return t("noteLatency"); },
+  get download() { return t("noteDownload"); },
+  get upload() { return t("noteUpload"); },
 };
 
 let providers = [];
-import { fetchIspData } from "./core/isp-data.js";
+// The ISP database is content several screens below the fold, and a static
+// import puts it in the module graph the dial waits on. It is loaded on idle
+// instead, from initIspData().
 
 const regionLabels = ["North America", "South America", "Europe", "Asia", "Middle East", "Africa", "Australia & Oceania"];
 const seoLocations = [
@@ -281,93 +646,149 @@ function renderSeoPages() {
   }).join("");
 }
 
-function setupCanvas() {
-  const canvas = qs("#heroCanvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  let width = 0;
-  let height = 0;
-  let nodes = [];
-  let isVisible = false;
-  let animFrameId = null;
+/**
+ * The Network Core — the 3D instrument behind the dial.
+ *
+ * Loaded lazily and OUT OF BAND: the renderer is fetched on idle, after the dial
+ * has painted, and never while a measurement is running. A speed test that
+ * downloads its own decoration mid-run has measured its own decoration.
+ *
+ * Everything about it degrades rather than fails. No WebGL, a starved GPU or
+ * prefers-reduced-motion all land on the static gradient field the stylesheet
+ * already draws, and the test itself is untouched either way.
+ */
+let networkCore = null;
+let coreLoading = false;
 
-  function resize() {
-    const pixelRatio = window.devicePixelRatio || 1;
-    width = canvas.offsetWidth;
-    height = canvas.offsetHeight;
-    canvas.width = Math.floor(width * pixelRatio);
-    canvas.height = Math.floor(height * pixelRatio);
-    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    const count = Math.max(48, Math.floor((width * height) / 21000));
-    nodes = Array.from({ length: count }, (_, index) => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      vx: rand(-0.25, 0.25),
-      vy: rand(-0.18, 0.18),
-      radius: index % 9 === 0 ? 2.4 : 1.35,
-      color: ["#24d1c3", "#57a6ff", "#f6b64b", "#62d26f"][index % 4]
-    }));
+/** Ease a measured value onto the 0-1 the renderer wants, on the dial's own scale. */
+function coreIntensity(mbps) {
+  return fractionFor(mbps, dialStops);
+}
+
+/** Put the scene behind the instrument rather than in the middle of the hero. */
+function alignCore() {
+  const stage = qs("#heroStage");
+  const instrument = qs("#instrument");
+  if (!networkCore || !stage || !instrument) return;
+  const stageBox = stage.getBoundingClientRect();
+  const targetBox = instrument.getBoundingClientRect();
+  if (!stageBox.width || !stageBox.height) return;
+  const x = (targetBox.left + targetBox.width / 2 - stageBox.left) / stageBox.width;
+  const y = (targetBox.top + targetBox.height / 2 - stageBox.top) / stageBox.height;
+  networkCore.setFocus(-(x * 2 - 1), y * 2 - 1);
+}
+
+async function setupNetworkCore() {
+  const canvas = qs("#coreCanvas");
+  const stage = qs("#heroStage");
+  if (!canvas || !stage || coreLoading || networkCore) return;
+  coreLoading = true;
+
+  const fallback = () => {
+    stage.dataset.fallback = "true";
+    canvas.remove();
+  };
+
+  let module;
+  try {
+    module = await import("./ui/network-core.js");
+  } catch (error) {
+    logError("network core", error);
+    fallback();
+    return;
   }
 
-  function draw() {
-    if (!isVisible) return;
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#071116";
-    ctx.fillRect(0, 0, width, height);
-    for (let i = 0; i < nodes.length; i += 1) {
-      const node = nodes[i];
-      node.x += node.vx;
-      node.y += node.vy;
-      if (node.x < -20) node.x = width + 20;
-      if (node.x > width + 20) node.x = -20;
-      if (node.y < -20) node.y = height + 20;
-      if (node.y > height + 20) node.y = -20;
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const other = nodes[j];
-        const distance = Math.hypot(node.x - other.x, node.y - other.y);
-        if (distance < 150) {
-          ctx.strokeStyle = `rgba(36, 209, 195, ${0.18 * (1 - distance / 150)})`;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(node.x, node.y);
-          ctx.lineTo(other.x, other.y);
-          ctx.stroke();
-        }
-      }
-    }
-    nodes.forEach((node) => {
-      ctx.beginPath();
-      ctx.globalAlpha = 0.78;
-      ctx.fillStyle = node.color;
-      ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    });
-    animFrameId = window.requestAnimationFrame(draw);
+  networkCore = module.createNetworkCore(canvas);
+  if (!networkCore) {
+    fallback();
+    return;
   }
 
-  resize();
-  window.addEventListener("resize", resize);
+  // The static field stays underneath at low opacity on the reduced-motion tier,
+  // so a single rendered frame still sits on something rather than on nothing.
+  if (networkCore.quality === "minimal") stage.dataset.fallback = "true";
 
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      isVisible = entry.isIntersecting;
-      if (isVisible) {
-        if (!animFrameId) draw();
-      } else {
-        if (animFrameId) {
-          window.cancelAnimationFrame(animFrameId);
-          animFrameId = null;
+  networkCore.resize();
+  alignCore();
+  networkCore.setPhase("idle", { intensity: 0.16 });
+  networkCore.start();
+  canvas.classList.add("ready");
+  log("network core", { quality: networkCore.quality, particles: networkCore.particleCount });
+
+  const onResize = () => {
+    networkCore.resize();
+    alignCore();
+  };
+  if (typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(onResize);
+    ro.observe(stage);
+  }
+  window.addEventListener("resize", onResize, { passive: true });
+  window.addEventListener("scroll", alignCore, { passive: true });
+
+  // Stop rendering the moment the canvas leaves the viewport. On a long page
+  // this is the difference between a GPU that idles and one that never does.
+  if (typeof IntersectionObserver !== "undefined") {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) networkCore.start();
+          else networkCore.stop();
         }
-      }
-    });
-  }, { rootMargin: "50px" });
+      },
+      { rootMargin: "80px" },
+    );
+    io.observe(stage);
+  }
 
-  observer.observe(canvas);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) networkCore.stop();
+    else if (stage.getBoundingClientRect().bottom > 0) networkCore.start();
+  });
+
+  // Parallax only where there is a real pointer. On touch it would be driven by
+  // scroll, which is exactly the motion people find nauseating.
+  if (window.matchMedia?.("(hover: hover) and (pointer: fine)").matches && networkCore.quality !== "minimal") {
+    window.addEventListener(
+      "pointermove",
+      (event) => {
+        const x = (event.clientX / window.innerWidth) * 2 - 1;
+        const y = (event.clientY / window.innerHeight) * 2 - 1;
+        networkCore.setParallax(x, y);
+      },
+      { passive: true },
+    );
+  }
+}
+
+/** Fire-and-forget helpers so call sites never have to null-check the renderer. */
+function corePhase(phase, options) {
+  networkCore?.setPhase(phase, options);
+}
+
+/**
+ * Hand the CPU and GPU back to the measurement.
+ *
+ * Called for the whole run rather than per phase: the latency probes are as
+ * sensitive to a busy main thread as the throughput phases are, and a scene
+ * that changed cadence three times mid-test would draw attention to itself at
+ * exactly the wrong moment.
+ *
+ * @param {boolean} on
+ */
+function coreMeasurementPriority(on) {
+  networkCore?.setMeasurementPriority(on);
+}
+function coreNoise(value) {
+  networkCore?.setNoise(value);
+}
+function corePulse() {
+  networkCore?.pulse();
 }
 
 function setMetric(id, value, digits = 0) {
   const el = qs(id);
+  if (!el) return;
   const empty = value === null;
   // An em dash, not two hyphens. "--" reads as a glyph that failed to load;
   // "—" is the typographic convention for "no value here", and it lets the
@@ -378,129 +799,266 @@ function setMetric(id, value, digits = 0) {
   el.closest(".metric-value")?.setAttribute("data-empty", String(empty));
 }
 
+/** The four headline tiles under the instrument. */
+const HERO_IDS = {
+  download: ["#pmDownload", 1],
+  upload: ["#pmUpload", 1],
+  ping: ["#pmPing", 0],
+  jitter: ["#pmJitter", 1],
+};
+
+function setHeroMetric(key, value) {
+  const entry = HERO_IDS[key];
+  if (!entry) return;
+  const el = qs(entry[0]);
+  if (!el) return;
+  const empty = value === null;
+  el.textContent = empty ? "—" : Number(value).toFixed(entry[1]);
+  el.dataset.empty = String(empty);
+  el.closest(".pm")?.setAttribute("data-live", String(!empty));
+}
+
 function updateScores() {
   const scores = qualityScores(state);
-  if (!scores) return;
+  if (!scores) {
+    // A run whose latency phase produced nothing cannot be scored. Returning
+    // here left the PREVIOUS run's six sub-scores and its verdict on screen
+    // beside the new run's blank tiles — so a failed test on a broken link
+    // displayed "Excellent global-ready connection" and a gaming score of 78.
+    // Nothing measured, nothing claimed.
+    state.health = null;
+    for (const selector of ["#wifiScore", "#gamingScore", "#streamingScore", "#videoScore", "#workScore", "#dnsScore"]) {
+      const el = qs(selector);
+      if (el) el.textContent = "—";
+    }
+    const title = qs("#analysisTitle");
+    const text = qs("#analysisText");
+    if (title) title.textContent = "Not enough measurements to score this connection";
+    if (text) {
+      text.textContent =
+        "The latency phase did not return enough probes to compute a score. The figures that were measured are still shown above.";
+    }
+    renderHealth(state, null, state.bufferbloat || null);
+    return;
+  }
   state.health = scores.health;
-  qs("#wifiScore").textContent = scores.health;
-  qs("#gamingScore").textContent = scores.gaming;
-  qs("#streamingScore").textContent = scores.streaming;
+
+  // The six sub-scores, shown in the diagnostics section further down.
+  const setScore = (selector, value) => {
+    const el = qs(selector);
+    if (el) el.textContent = value ?? "--";
+  };
+  setScore("#wifiScore", scores.health);
+  setScore("#gamingScore", scores.gaming);
+  setScore("#streamingScore", scores.streaming);
   // Null when the metric each depends on could not be measured: video and work
-  // need upload, work and dns need DNS. Printing the placeholder keeps these
-  // tiles consistent with the raw "-- Mbps" shown further up the page.
-  qs("#videoScore").textContent = scores.video ?? "--";
-  qs("#workScore").textContent = scores.work ?? "--";
-  qs("#dnsScore").textContent = scores.dns ?? "--";
+  // need upload, work and dns need DNS.
+  setScore("#videoScore", scores.video);
+  setScore("#workScore", scores.work);
+  setScore("#dnsScore", scores.dns);
+
   const verdict = healthVerdict(scores.health);
-  qs("#analysisTitle").textContent = verdict.title;
-  qs("#analysisText").textContent = verdict.detail;
-  renderResultSummary(scores);
+  const title = qs("#analysisTitle");
+  const text = qs("#analysisText");
+  if (title) title.textContent = verdict.title;
+  if (text) text.textContent = verdict.detail;
+
+  renderHealth(state, scores.health, state.bufferbloat || null);
+  renderPath(state, state.bufferbloat || null, {
+    degraded: Boolean(state.degraded),
+    edgeLabel: state.edgeLabel || null,
+  });
   updateAiDoctor();
 }
 
 function updateAiDoctor() {
   const panel = qs("#aiDoctorPanel");
-  const summaryEl = qs("#aiDoctorSummary");
-  const recsEl = qs("#aiDoctorRecommendations");
-  if (!panel || !summaryEl || !recsEl) return;
-
+  if (!panel) return;
   if (state.download === null) {
     panel.hidden = true;
     return;
   }
-
-  const diagnosis = generateAiDiagnosis(state, state.bufferbloat || null);
-  panel.hidden = false;
-  summaryEl.classList.remove("shimmer-placeholder");
-  summaryEl.textContent = diagnosis.summary;
-
-  recsEl.innerHTML = diagnosis.recommendations.map(rec => `
-    <div style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid rgba(0, 242, 255, 0.2); border-radius: 10px; background: rgba(0, 242, 255, 0.05); backdrop-filter: blur(12px);">
-      <span style="color: var(--teal); font-weight: 800; font-size: 1rem; flex-shrink: 0; margin-top: 1px;">✦</span>
-      <span style="font-size: 0.88rem; color: var(--ink); font-weight: 600; line-height: 1.5;">${rec}</span>
-    </div>
-  `).join("");
+  renderDoctor(generateAiDiagnosis(state, state.bufferbloat || null), state, state.bufferbloat || null);
 }
 
-function renderResultSummary(scores) {
-  const panel = qs("#resultSummary");
-  if (!panel) return;
-  panel.hidden = false;
-  qs("#summaryHealth").textContent = `Health ${scores.health}/100`;
-  qs("#summaryHealthText").textContent = healthVerdict(scores.health).detail;
+// ---- The dial ------------------------------------------------------------
+// A 270° sweep on the same non-linear scale consumer testers use: the slow end
+// gets most of the arc, so a 30 Mbps line moves the needle across half the dial
+// instead of nudging it off zero. The maths is shared with the Next.js front end
+// through core/gauge.js — the two dials differ only in sweep and radius.
+const DIAL_ARC = 744.56; // path length of the visible 270° arc at r=158
+const DIAL_GEOMETRY = { start: 135, sweep: 270 };
+const DIAL_CENTER = 200;
 
-  const loss = state.loss ?? 0;
-  qs("#summaryLoss").textContent = loss > 0 ? `${loss.toFixed(1)}% packet loss` : "No packet loss detected";
-  qs("#summaryLossText").textContent = loss > 0
-    ? "Loss causes lag spikes, buffering and call drops. Check WiFi signal, cabling, router load and ISP congestion."
-    : "No probe loss landed in this run. Focus on latency, jitter and queueing if the connection still feels bad.";
+/**
+ * The scale currently drawn on the dial.
+ *
+ * `core/gauge.js` has always exported `scaleFor()`, which grows the dial to
+ * 2.5G, 5G and 10G — and this front end never called it. Every stop was
+ * hardcoded to the 0-1G set and the ticks were drawn exactly once
+ * (`if (group.childElementCount) return`), so on a connection faster than a
+ * gigabit `fractionFor()` clamped to 1 and the needle sat pinned at the top of
+ * the dial while the readout kept climbing past it. The instrument and the
+ * number it surrounds disagreed, and the instrument was the one that was wrong.
+ *
+ * @type {number[]}
+ */
+let dialStops = [...BASE_STOPS];
 
-  const uploadRatio = state.download && state.upload ? state.upload / state.download : 0;
-  qs("#summaryBalance").textContent = uploadRatio > 0.35 ? "Balanced upstream" : "Upload-limited link";
-  qs("#summaryBalanceText").textContent = uploadRatio > 0.35
-    ? "Upload is strong enough for video calls, cloud backup and sending large files while browsing."
-    : "Upload is much lower than download. Video calls, livestreaming and cloud backup may saturate the line first.";
+/**
+ * Grow the dial if the link has outrun it.
+ *
+ * `scaleFor` never shrinks within a run, so the dial cannot rescale downward
+ * mid-measurement — a rising number that appeared to fall because the axis moved
+ * under it would be worse than a pinned needle.
+ *
+ * @param {number} peak highest value the dial must be able to show
+ * @returns {boolean} whether the scale changed
+ */
+function ensureDialScale(peak) {
+  const next = scaleFor(peak, dialStops);
+  if (next.length === dialStops.length && next.every((v, i) => v === dialStops[i])) return false;
+  dialStops = next;
+  const group = qs("#dialTicks");
+  if (group) group.innerHTML = "";
+  renderDialTicks();
+  return true;
 }
 
-// ---- GO button + live gauge ---------------------------------------------
-// The dial uses the same non-linear scale as consumer speed testers: the slow
-// end gets most of the sweep, so a 30 Mbps line still moves the needle across
-// half the dial instead of nudging it off zero.
-const GAUGE_ARC = 612.6;   // path length of the 270 degree visible arc
-// This dial sweeps 270 degrees starting at the lower left; the 180 degree dial
-// in web/ passes different values to the same shared helpers.
-const GAUGE_GEOMETRY = { start: 135, sweep: 270 };
-const GAUGE_CENTER = 170;
-
-// Scale numbers sit just inside the arc, each at its own angle.
-function renderGaugeTicks() {
-  const group = qs("#gaugeTicks");
+function renderDialTicks() {
+  const group = qs("#dialTicks");
   if (!group || group.childElementCount) return;
-  const last = BASE_STOPS.length - 1;
-  group.innerHTML = BASE_STOPS.map((stop, index) => {
-    const { x, y } = pointOnArc(index / last, 103, GAUGE_CENTER, GAUGE_CENTER, GAUGE_GEOMETRY);
-    // Dim the top half of the scale so the range people actually land in reads first.
-    const dim = stop >= 100 ? " dim" : "";
-    return `<text class="gauge-tick${dim}" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${labelFor(stop)}</text>`;
-  }).join("");
+  const last = dialStops.length - 1;
+  const parts = [];
+  for (let i = 0; i <= last; i += 1) {
+    const fraction = i / last;
+    const outer = pointOnArc(fraction, 181, DIAL_CENTER, DIAL_CENTER, DIAL_GEOMETRY);
+    const inner = pointOnArc(fraction, 168, DIAL_CENTER, DIAL_CENTER, DIAL_GEOMETRY);
+    parts.push(
+      `<line class="dial-major" x1="${outer.x}" y1="${outer.y}" x2="${inner.x}" y2="${inner.y}" />`,
+    );
+    // The 0-100 half is where almost every connection lands, so its labels are
+    // the brighter ones. Dimming the top of the scale is what stops a dial that
+    // reaches 10 Gbps from making an ordinary link look like a rounding error.
+    const at = pointOnArc(fraction, 138, DIAL_CENTER, DIAL_CENTER, DIAL_GEOMETRY);
+    const hot = dialStops[i] <= 100 ? " hot" : "";
+    parts.push(`<text class="dial-tick${hot}" x="${at.x}" y="${at.y}">${labelFor(dialStops[i])}</text>`);
+
+    if (i < last) {
+      for (let m = 1; m < 5; m += 1) {
+        const minor = (i + m / 5) / last;
+        const a = pointOnArc(minor, 181, DIAL_CENTER, DIAL_CENTER, DIAL_GEOMETRY);
+        const b = pointOnArc(minor, 174, DIAL_CENTER, DIAL_CENTER, DIAL_GEOMETRY);
+        parts.push(`<line class="dial-minor" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" />`);
+      }
+    }
+  }
+  group.innerHTML = parts.join("");
 }
 
-// Positions the dial and writes the readout. Kept separate from setGauge so a
-// phase can sweep the arc as progress while showing a number that means
-// something else — during ping the arc is progress and the number is real ms.
-function setGaugeFraction(fraction, readout, phase, unit) {
-  const fill = qs("#gaugeFill");
-  const needle = qs("#gaugeNeedle");
-  if (!fill || !needle) return;
+/**
+ * Position the arc and write the readout.
+ *
+ * Kept separate from `setDialSpeed` so a phase can sweep the arc as PROGRESS
+ * while the number means something else entirely — during the latency phase the
+ * arc is how far through the probes we are, and the number is real milliseconds.
+ *
+ * @param {number} fraction 0-1 of the arc
+ * @param {string} readout
+ * @param {string} phase
+ * @param {string} unit
+ * @param {"down" | "up" | "ping"} [direction]
+ */
+function setDial(fraction, readout, phase, unit, direction) {
   const bounded = clamp(fraction, 0, 1);
-  fill.setAttribute("stroke-dashoffset", String(GAUGE_ARC * (1 - bounded)));
-  needle.setAttribute(
-    "transform",
-    `rotate(${needleAngle(bounded, GAUGE_GEOMETRY).toFixed(2)} ${GAUGE_CENTER} ${GAUGE_CENTER})`,
+  const progress = qs("#dialProgress");
+  const needle = qs("#dialNeedle");
+  if (progress) progress.setAttribute("stroke-dashoffset", String(DIAL_ARC * (1 - bounded)));
+  if (needle) {
+    needle.setAttribute(
+      "transform",
+      `rotate(${needleAngle(bounded, DIAL_GEOMETRY).toFixed(2)} ${DIAL_CENTER} ${DIAL_CENTER})`,
+    );
+  }
+  const value = qs("#dialValue");
+  const unitEl = qs("#dialUnit");
+  const phaseEl = qs("#dialPhase");
+  if (value) value.textContent = readout;
+  if (unitEl) unitEl.textContent = unit;
+  if (phase && phaseEl) phaseEl.textContent = phase;
+  if (direction) {
+    const instrument = qs("#instrument");
+    if (instrument) instrument.dataset.dir = direction;
+  }
+}
+
+/** @param {number} mbps @param {"down" | "up"} direction */
+function setDialSpeed(mbps, direction) {
+  // Grow the dial BEFORE placing the needle, so a value past the old ceiling is
+  // drawn against the scale that can actually contain it rather than clamped to
+  // the top of one that cannot.
+  ensureDialScale(mbps);
+  setDial(
+    fractionFor(mbps, dialStops),
+    Number(mbps).toFixed(2),
+    direction === "up" ? t("phaseUpload") : t("phaseDownload"),
+    "Mbps",
+    direction,
   );
-  qs("#gaugeReadout").textContent = readout;
-  qs("#gaugeUnit").textContent = unit;
-  if (phase) qs("#gaugePhase").textContent = phase;
 }
 
-function setGauge(mbps, phase) {
-  setGaugeFraction(fractionFor(mbps, BASE_STOPS), Number(mbps).toFixed(2), phase, "Mbps");
+// ---- Phase rail ----------------------------------------------------------
+// Six named steps. Each one is marked done only when the thing it names has
+// actually finished, so the rail is a record of the run rather than a timer.
+const PHASE_ORDER = ["select", "latency", "download", "upload", "stability", "analyse"];
+
+/** @param {string | null} active @param {boolean} [allDone] */
+function setPhaseRail(active, allDone = false) {
+  const rail = qs("#phaseRail");
+  if (!rail) return;
+  const index = active ? PHASE_ORDER.indexOf(active) : -1;
+  qsa(".phase-step", rail).forEach((step) => {
+    const position = PHASE_ORDER.indexOf(step.dataset.phase);
+    if (allDone) step.dataset.state = "done";
+    else if (index < 0) step.removeAttribute("data-state");
+    else if (position < index) step.dataset.state = "done";
+    else if (position === index) step.dataset.state = "active";
+    else step.removeAttribute("data-state");
+  });
 }
 
-// Swaps the GO button for the dial (and back) without disturbing the metric grid.
-// mode: "idle" (GO only) | "running" (dial only) | "done" (dial + small AGAIN)
-function showGauge(mode) {
+/**
+ * The instrument has three states and the CTA follows them.
+ *
+ * @param {"idle" | "running" | "done"} mode
+ */
+function setInstrumentState(mode) {
+  const instrument = qs("#instrument");
   const button = qs("#goButton");
-  const gauge = qs("#gauge");
-  if (!button || !gauge) return;
-  const dial = mode !== "idle";
-  gauge.hidden = !dial;
-  gauge.setAttribute("aria-hidden", dial ? "false" : "true");
-  button.hidden = mode === "running";
-  button.classList.toggle("compact", mode === "done");
-  button.textContent = mode === "done" ? "AGAIN" : "GO";
-  const caption = qs("#goCaption");
-  if (caption) caption.hidden = mode !== "idle";
+  const label = qs("#goLabel");
+  const sub = qs("#goSub");
+  const stop = qs("#stopTest");
+  const report = qs("#seeReport");
+  if (instrument) instrument.dataset.state = mode;
+  if (button) {
+    button.dataset.state = mode;
+    button.setAttribute("aria-busy", String(mode === "running"));
+  }
+  if (label) label.textContent = mode === "running" ? t("testing") : mode === "done" ? t("testAgain") : t("startTest");
+  if (sub) sub.hidden = mode !== "idle";
+  if (stop) stop.hidden = mode !== "running";
+  if (report) report.hidden = mode !== "done";
+  if (mode === "idle") {
+    setDial(0, "0.00", t("dialReady"), "Mbps", "down");
+    const note = qs("#dialNote");
+    if (note) note.textContent = t("dialNote");
+  }
+}
+
+/** Screen readers get the run through here, not through the dial. */
+function announce(message) {
+  const live = qs("#liveAnnounce");
+  if (live) live.textContent = message;
 }
 
 // ---- Who you are on the network -----------------------------------------
@@ -549,196 +1107,121 @@ async function renderConnection() {
   paintConnection(net, true);
 }
 
-// ---- Live throughput graph ----------------------------------------------
-// Plots the exact samples the measurement reports, download and upload on one
-// timeline, redrawn on rAF so it stays smooth without re-running any layout.
-const graphData = { down: [], up: [], startAt: 0 };
-let graphFrame = null;
-
 /**
- * Reads a design token so the canvas can be painted in the site's own colours.
- * A canvas cannot inherit CSS, so without this the graph is stuck with whatever
- * palette was hardcoded — which is why its gridlines and label used to vanish
- * against the light theme.
+ * Reads a design token so a canvas can be painted in the site's own colours.
+ * A canvas cannot inherit CSS, so without this the sparklines are stuck with
+ * whatever palette was hardcoded — which is why they used to vanish in the
+ * light theme.
  */
 function token(name, fallback) {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return value || fallback;
 }
 
-function drawGraph() {
-  const canvas = qs("#liveGraph");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const { width, height } = canvas;
-  const pad = 6;
-  ctx.clearRect(0, 0, width, height);
+// ---- Sparklines ----------------------------------------------------------
+// The shape of each metric while it is being measured, under its own tile. The
+// full-width throughput graph that used to live here is gone: it duplicated the
+// dial, doubled the per-frame canvas work during the one phase where the CPU is
+// also feeding eight download streams, and nobody read it.
+const sparklineData = { down: [], up: [], ping: [], jitter: [] };
+let lastGraphSample = { down: 0, up: 0, ping: 0, jitter: 0 };
 
-  const all = graphData.down.concat(graphData.up);
-  const peak = Math.max(1, ...all.map((point) => point.v));
-  const span = Math.max(1000, ...all.map((point) => point.t));
-
-  // Horizontal reference lines at quarters of the peak.
-  ctx.strokeStyle = token("--line", "rgba(255,255,255,0.09)");
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i += 1) {
-    const y = pad + ((height - pad * 2) * i) / 4;
-    ctx.beginPath();
-    ctx.moveTo(pad, y);
-    ctx.lineTo(width - pad, y);
-    ctx.stroke();
-  }
-
-  const plot = (points, stroke, fill) => {
-    if (points.length < 2) return;
-    const x = (t) => pad + ((width - pad * 2) * t) / span;
-    const y = (v) => height - pad - ((height - pad * 2) * v) / peak;
-
-    ctx.beginPath();
-    ctx.moveTo(x(points[0].t), y(points[0].v));
-    points.forEach((point) => ctx.lineTo(x(point.t), y(point.v)));
-
-    // Area under the trace, then the trace itself on top.
-    ctx.save();
-    ctx.lineTo(x(points[points.length - 1].t), height - pad);
-    ctx.lineTo(x(points[0].t), height - pad);
-    ctx.closePath();
-    ctx.fillStyle = fill;
-    ctx.fill();
-    ctx.restore();
-
-    ctx.beginPath();
-    ctx.moveTo(x(points[0].t), y(points[0].v));
-    points.forEach((point) => ctx.lineTo(x(point.t), y(point.v)));
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = 3;
-    ctx.lineJoin = "round";
-    ctx.stroke();
-  };
-
-  // Download in brand blue, upload in brand teal — the same pair the dial's arc
-  // and the rest of the page use, so the traces are readable without a legend.
-  const down = token("--blue", "#57a6ff");
-  const up = token("--teal", "#24d1c3");
-  plot(graphData.down, down, `color-mix(in srgb, ${down} 22%, transparent)`);
-  plot(graphData.up, up, `color-mix(in srgb, ${up} 20%, transparent)`);
-
-  ctx.fillStyle = token("--muted", "rgba(255,255,255,0.55)");
-  ctx.font = "600 13px Inter, system-ui, sans-serif";
-  ctx.fillText(`peak ${peak.toFixed(1)} Mbps`, pad + 4, pad + 16);
-}
-
-function startGraph() {
-  graphData.down = [];
-  graphData.up = [];
-  graphData.startAt = performance.now();
-  const canvas = qs("#liveGraph");
-  if (canvas) canvas.hidden = false;
-  if (graphFrame === null) {
-    const loop = () => {
-      drawGraph();
-      graphFrame = window.requestAnimationFrame(loop);
-    };
-    graphFrame = window.requestAnimationFrame(loop);
-  }
-}
-
-function stopGraph() {
-  if (graphFrame !== null) {
-    window.cancelAnimationFrame(graphFrame);
-    graphFrame = null;
-  }
-  drawGraph(); // leave the finished shape on screen
-}
-
-// Samples arrive faster than the eye can use; ~25 Hz keeps the arrays small.
-let lastGraphSample = { down: 0, up: 0, ping: 0 };
-const sparklineData = { down: [], up: [], ping: [] };
+const SPARK_IDS = {
+  down: ["#sparklineDownload", "--brand", "#2ee6f6"],
+  up: ["#sparklineUpload", "--up", "#8b8cff"],
+  ping: ["#sparklinePing", "--warn", "#ffb454"],
+  jitter: ["#sparklineJitter", "--up", "#8b8cff"],
+};
 
 function drawSparkline(id, points, color) {
   const canvas = qs(id);
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
-  const width = canvas.offsetWidth || 300;
-  const height = canvas.offsetHeight || 36;
-  const dpr = window.devicePixelRatio || 1;
-  if (canvas.width !== width * dpr) {
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
+  const width = canvas.offsetWidth || 120;
+  const height = canvas.offsetHeight || 20;
+  // Capped at 2: a 3x phone display gains nothing visible from a 22px-tall
+  // sparkline rendered at 3x, and pays for every pixel of it.
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (canvas.width !== Math.round(width * dpr)) {
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
   if (points.length < 2) return;
-  
-  const peak = Math.max(...points) || 1;
-  const min = Math.min(...points) || 0;
+
+  const peak = Math.max(...points);
+  const min = Math.min(...points);
   const range = peak === min ? 1 : peak - min;
-  
+  const x = (i) => (i / (points.length - 1)) * width;
+  const y = (v) => height - 3 - ((v - min) / range) * (height - 6);
+
   ctx.beginPath();
-  points.forEach((val, i) => {
-    const x = (i / (points.length - 1)) * width;
-    const y = height - 4 - ((val - min) / range) * (height - 8);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  
+  ctx.moveTo(x(0), y(points[0]));
+  for (let i = 1; i < points.length; i += 1) ctx.lineTo(x(i), y(points[i]));
+
+  const fill = ctx.createLinearGradient(0, 0, 0, height);
+  fill.addColorStop(0, color);
+  fill.addColorStop(1, "transparent");
+  ctx.save();
+  ctx.lineTo(x(points.length - 1), height);
+  ctx.lineTo(x(0), height);
+  ctx.closePath();
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.moveTo(x(0), y(points[0]));
+  for (let i = 1; i < points.length; i += 1) ctx.lineTo(x(i), y(points[i]));
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 1.8;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.stroke();
-  
-  const grad = ctx.createLinearGradient(0, 0, 0, height);
-  grad.addColorStop(0, color);
-  grad.addColorStop(1, "transparent");
-  ctx.lineTo(width, height);
-  ctx.lineTo(0, height);
-  ctx.fillStyle = grad;
-  ctx.globalAlpha = 0.2;
-  ctx.fill();
-  ctx.globalAlpha = 1.0;
 }
 
-function pushGraphSample(kind, mbps) {
+/**
+ * Samples arrive faster than the eye can use, and every one of them lands
+ * during the phase that is already saturating the connection. Throttling to
+ * ~25 Hz keeps the arrays small and the main thread free for the transfer.
+ */
+function pushGraphSample(kind, value) {
+  const entry = SPARK_IDS[kind];
+  if (!entry) return;
   const now = performance.now();
   if (now - lastGraphSample[kind] < 40) return;
   lastGraphSample[kind] = now;
-  
-  if (kind === 'down' || kind === 'up') {
-    graphData[kind].push({ t: now - graphData.startAt, v: mbps });
+  const series = sparklineData[kind];
+  series.push(value);
+  // Bounded so a long run cannot grow an unbounded array behind the tile.
+  if (series.length > 160) series.shift();
+  drawSparkline(entry[0], series, token(entry[1], entry[2]));
+}
+
+function clearSparklines() {
+  for (const kind of Object.keys(sparklineData)) {
+    sparklineData[kind] = [];
+    lastGraphSample[kind] = 0;
+    const canvas = qs(SPARK_IDS[kind][0]);
+    if (!canvas) continue;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
-  
-  sparklineData[kind].push(mbps);
-  
-  if (kind === 'down') drawSparkline("#sparklineDownload", sparklineData.down, token("--blue", "#57a6ff"));
-  if (kind === 'up') drawSparkline("#sparklineUpload", sparklineData.up, token("--teal", "#24d1c3"));
-  if (kind === 'ping') drawSparkline("#sparklinePing", sparklineData.ping, token("--amber", "#f6b64b"));
+}
+
+function redrawSparklines() {
+  for (const [kind, entry] of Object.entries(SPARK_IDS)) {
+    drawSparkline(entry[0], sparklineData[kind], token(entry[1], entry[2]));
+  }
 }
 
 // ---- Local test history --------------------------------------------------
-// Storage, capping and delta maths live in core/history.js; this renders them.
+// Storage, capping and delta maths live in core/history.js; ui/report.js draws
+// it. This is only the seam between them.
 function renderHistory() {
-  const history = loadHistory();
-  const panel = qs("#historyPanel");
-  const list = qs("#historyList");
-  if (!panel || !list) return;
-  panel.hidden = history.length === 0;
-
-  list.innerHTML = history.map((entry, index) => {
-    // Change against the run before it, so a slowdown is visible at a glance.
-    const delta = downloadDelta(entry, history[index + 1]);
-    const deltaLabel = delta === null
-      ? ""
-      : `<span class="delta ${delta >= 0 ? "up" : "down"}">${delta >= 0 ? "▲" : "▼"} ${Math.abs(delta).toFixed(0)}% vs previous</span>`;
-    const when = new Date(entry.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-    return `<div class="history-row">
-      <span class="when">${when}</span>
-      <span>${entry.download} Mbps down</span>
-      <span>${entry.upload === null ? "upload n/a" : `${entry.upload} Mbps up`}</span>
-      <span>${entry.ping} ms</span>
-      ${deltaLabel || "<span></span>"}
-    </div>`;
-  }).join("");
+  paintHistory(loadHistory(), downloadDelta);
 }
 
 // ---- Shareable result links ---------------------------------------------
@@ -776,9 +1259,11 @@ function applyResultFromHash() {
   publishMetric("dns", state.dns);
   publishMetric("stability", state.stability);
   updateScores();
-  renderGaugeTicks();
-  setGauge(isMeasured(state.download) ? state.download : 0, "DOWNLOAD");
-  showGauge("done");
+  renderDialTicks();
+  setDialSpeed(isMeasured(state.download) ? state.download : 0, "down");
+  setInstrumentState("done");
+  setPhaseRail(null, true);
+  revealReport();
 
   const who = [shared.isp, shared.edgeCity].filter(Boolean).join(" · ");
   qs("#testStatus").textContent = `Shared result${who ? ` from ${who}` : ""}, measured ${new Date(shared.at).toLocaleString()}. Run your own test to compare.`;
@@ -788,7 +1273,7 @@ async function copyResultLink() {
   // Returning silently made this a dead button before a run: a click, and
   // nothing on screen changed. There is no link to copy yet, so say that.
   if (state.download === null) {
-    qs("#testStatus").textContent = "Nothing to copy yet — press GO to measure your connection first.";
+    qs("#testStatus").textContent = "Nothing to copy yet — press Start to measure your connection first.";
     return;
   }
   const link = currentResultLink();
@@ -804,56 +1289,32 @@ async function copyResultLink() {
 
 // ---- Deep-measurement panels --------------------------------------------
 function renderLatencyPanel(latency) {
-  qs("#insightGrid").hidden = false;
-  // Jitter is null when a single probe returned — variation between samples is
-  // undefined with one sample. Interpolating that null printed "jitter null ms".
-  const jitter = latency.jitter === null ? "not measurable" : `${latency.jitter} ms`;
-  qs("#latencyProbes").textContent = `${latency.samples.length} probes · jitter ${jitter} · loss ${latency.loss}%`;
-  qs("#latMin").textContent = latency.min;
-  qs("#latMedian").textContent = latency.ping;
-  qs("#latP95").textContent = latency.p95;
-  qs("#latMax").textContent = latency.max;
+  const probes = qs("#latencyProbes");
+  if (probes) {
+    // Every one of these can legitimately be null: jitter is undefined from a
+    // single sample, and a latency phase that failed outright has no figures
+    // at all. Interpolating a null printed "jitter null ms · loss null%".
+    const say = (value, unit) => (Number.isFinite(value) ? `${value}${unit}` : "not measurable");
+    probes.textContent = latency.samples.length
+      ? `${latency.samples.length} probes · jitter ${say(latency.jitter, " ms")} · loss ${say(latency.loss, "%")}`
+      : "No latency probe returned — nothing in this panel could be measured.";
+  }
+  const set = (selector, value) => {
+    const el = qs(selector);
+    if (el) el.textContent = value === null || value === undefined ? "—" : value;
+  };
+  set("#latMin", latency.min);
+  set("#latMedian", latency.ping);
+  set("#latP95", latency.p95);
+  set("#latMax", latency.max);
+  renderLatencyChart(qs("#latencyChart"), latency, qs("#latencyChartDesc"));
+  if (Number.isFinite(latency.jitter)) pushGraphSample("jitter", latency.jitter);
 }
 
 function renderBufferbloat(bloat) {
   state.bufferbloat = bloat;
-  qs("#insightGrid").hidden = false;
-  const badge = qs("#bloatGrade");
-
-  // Too few probes survived the saturated link to judge it. Saying so beats
-  // printing a grade derived from one straggler that spent its life queued.
-  if (!bloat) {
-    badge.textContent = "?";
-    badge.classList.remove("warn", "bad");
-    qs("#bloatDelta").textContent = "Not measurable this run";
-    qs("#bloatDetail").textContent =
-      "Too few latency probes returned while the link was saturated to judge queueing.";
-    qs("#bloatVerdict").textContent =
-      "This usually means the connection was fully occupied by the download. Re-run the test, ideally with other devices idle.";
-    return;
-  }
-
-  badge.textContent = bloat.grade;
-  badge.classList.toggle("warn", ["B", "C"].includes(bloat.grade));
-  badge.classList.toggle("bad", ["D", "F"].includes(bloat.grade));
-  qs("#bloatDelta").textContent = `+${bloat.increase} ms under load`;
-  qs("#bloatDetail").textContent = `Idle ${bloat.idle} ms rising to ${bloat.loaded} ms while the link is saturated.`;
-  qs("#bloatVerdict").textContent = bufferbloatVerdict(bloat.increase);
+  paintBufferbloat(bloat);
 }
-
-/**
- * What the page says during each phase. The wording lives here rather than in
- * the engine: `core/run.js` reports which phase it is in, and each front end
- * chooses how to say it.
- *
- * @type {Record<string, string>}
- */
-const PHASE_COPY = {
-  select: "Selecting the nearest measurement edge by latency...",
-  latency: "Measuring ping, jitter, percentiles, packet loss and DNS...",
-  download: "Measuring download throughput and latency under load...",
-  upload: "Measuring upload throughput...",
-};
 
 /**
  * Name the edge the numbers are actually being measured against.
@@ -947,11 +1408,12 @@ function setMetricState(keys, next) {
 /**
  * Publish a measured value, or refuse to.
  *
- * This is the single gate between the engine and the grid. A value that is
- * null, NaN, Infinity or negative never reaches the DOM as a number: the tile
- * keeps its em dash and the badge says why. Without this gate a divide-by-zero
- * in a throughput window renders as "NaN Mbps", which looks like a measurement
- * and is not one.
+ * This is the single gate between the engine and every surface that shows a
+ * number — the headline tiles, the advanced grid and the exported card all read
+ * from here. A value that is null, NaN, Infinity or negative never reaches the
+ * DOM as a number: the tile keeps its em dash and the badge says why. Without
+ * this gate a divide-by-zero in a throughput window renders as "NaN Mbps",
+ * which looks like a measurement and is not one.
  *
  * @param {string} key
  * @param {unknown} value
@@ -963,6 +1425,7 @@ function publishMetric(key, value, whenMissing = MetricState.UNAVAILABLE) {
   const [selector, digits] = entry;
   const ok = isMeasured(value);
   setMetric(selector, ok ? Number(value) : null, digits);
+  setHeroMetric(key, ok ? Number(value) : null);
   setMetricState([key], settle(value, whenMissing));
 }
 
@@ -979,6 +1442,7 @@ function publishLiveMetric(key, value) {
   if (!entry || !isMeasured(value)) return;
   const [selector, digits] = entry;
   setMetric(selector, Number(value), digits);
+  setHeroMetric(key, Number(value));
   if (metricStates[key] === MetricState.NOT_STARTED) setMetricState([key], MetricState.TESTING);
 }
 
@@ -988,8 +1452,10 @@ function resetMetricCards() {
   for (const key of METRIC_KEYS) {
     const [selector, digits] = VALUE_IDS[key];
     setMetric(selector, null, digits);
+    setHeroMetric(key, null);
     paintBadge(key);
   }
+  renderHealth({ download: null, upload: null, ping: null, jitter: null, loss: null, dns: null, stability: null }, null, null);
 }
 
 // Track visibility changes to notify Web Worker
@@ -1004,218 +1470,387 @@ document.addEventListener("visibilitychange", () => {
 
 let testRunning = false;
 
+/** Put the whole result surface back to "nothing measured yet". */
+function resetRunUi() {
+  Object.assign(state, {
+    download: null,
+    upload: null,
+    ping: null,
+    jitter: null,
+    loss: null,
+    dns: null,
+    stability: null,
+    health: null,
+    bufferbloat: null,
+    degraded: false,
+  });
+  resetMetricCards();
+  clearSparklines();
+  resetReport();
+  renderLatencyChart(qs("#latencyChart"), { samples: [] }, qs("#latencyChartDesc"));
+  const probes = qs("#latencyProbes");
+  if (probes) probes.textContent = "—";
+  paintBufferbloat(null);
+}
+
 async function runSpeedTest() {
+  if (testRunning) return;
+  testRunning = true;
+
   const progress = qs("#testProgress");
   const status = qs("#testStatus");
   const degradedBanner = qs("#degradedBanner");
   const degradedReason = qs("#degradedReason");
 
-  if (testRunning) return;
-  testRunning = true;
-
   try {
-    if (degradedBanner) degradedBanner.hidden = true;
-    if (progress) progress.style.width = "0%";
-    if (status) status.textContent = "Launching real network measurement engine...";
-    if (qs("#stopTest")) qs("#stopTest").hidden = false;
-    if (qs("#resultSummary")) qs("#resultSummary").hidden = true;
-    qs(".gauge-stage")?.classList.add("active");
-    renderGaugeTicks();
-    showGauge("running");
-    setGaugeFraction(0, "—", "PING", "ms");
-
-    Object.assign(state, {
-      download: null,
-      upload: null,
-      ping: null,
-      jitter: null,
-      loss: null,
-      dns: null,
-      stability: null,
-      health: null,
-      bufferbloat: null,
-    });
-
-    const aiDoctor = qs("#aiDoctorPanel");
-    if (aiDoctor) aiDoctor.hidden = true;
-    qsa(".animate-panel").forEach((p) => p.classList.remove("animate-in"));
-
-    sparklineData.down = [];
-    sparklineData.up = [];
-    sparklineData.ping = [];
-    qsa(".sparkline-canvas").forEach((c) => {
-      const ctx = c.getContext("2d");
-      ctx.clearRect(0, 0, c.width, c.height);
-    });
-
-    resetMetricCards();
-
-    // Launch Web Worker measurement.
+    // ---- Start measuring FIRST -----------------------------------------
+    // The worker is spawned and told to run before a single pixel changes, so
+    // the button animation is a response to the click rather than a gate in
+    // front of it. Nothing below this block delays the first byte.
     //
-    // The debug flag is carried on the worker's own URL. A Worker has no
+    // The debug flag rides on the worker's own URL: a Worker has no
     // localStorage and does not inherit the page's query string, so
-    // `debugEnabled()` was always false inside it — which meant the debug mode
-    // logged the finished result and none of the transfers that produced it,
-    // exactly the detail it exists to show.
+    // `debugEnabled()` was always false inside it.
     const workerUrl = new URL("./worker/measure.js", import.meta.url);
     if (debugEnabled()) workerUrl.searchParams.set("debug", "1");
     activeWorker = new Worker(workerUrl, { type: "module" });
 
     // A worker that fails to parse or import never sends a message, so without
-    // this the page would sit on "Launching…" forever with no explanation.
+    // this the page would sit on "launching…" forever with no explanation.
     activeWorker.onerror = (event) => {
       logError("worker failed to start", event.message || "unknown");
       failRun(`The measurement engine could not start (${event.message || "worker error"}).`);
     };
-
-    activeWorker.onmessage = (e) => {
-      const { type, data } = e.data;
-      if (type === "onPhase") {
-        status.textContent = PHASE_COPY[data] || `Running ${data}...`;
-        // Entering a phase puts its metrics on "measuring", which is what makes
-        // the badge tell the truth mid-run instead of pre-claiming a result.
-        if (data === "latency") setMetricState(["ping", "jitter", "loss", "dns"], MetricState.TESTING);
-        if (data === "download") setMetricState(["download", "bufferbloat"], MetricState.TESTING);
-        if (data === "upload") setMetricState(["upload", "stability"], MetricState.TESTING);
-      } else if (type === "onProgress") {
-        progress.style.width = `${clamp(data, 0, 100)}%`;
-      } else if (type === "onMetric") {
-        // Running values during a phase: shown live, badge stays "measuring".
-        for (const key of ["ping", "jitter", "loss", "dns", "download", "upload", "stability"]) {
-          if (data[key] !== undefined) publishLiveMetric(key, data[key]);
-        }
-      } else if (type === "onEdge") {
-        setEdgeLabel(data.label);
-      } else if (type === "onFallback") {
-        if (degradedBanner && degradedReason) {
-          degradedBanner.hidden = false;
-          degradedReason.textContent = `${data.name || "Primary edge"} failed (${data.error}). Measuring against the next edge instead.`;
-        }
-      } else if (type === "onLatencyProbe") {
-        if (data.lastRtt !== null && Number.isFinite(data.lastRtt)) {
-          setGaugeFraction(0.5, data.lastRtt.toFixed(0), "PING", "ms");
-          pushGraphSample("ping", data.lastRtt);
-        }
-      } else if (type === "onDownloadSample") {
-        setGauge(data.mbps, "DOWNLOAD");
-        pushGraphSample("down", data.mbps);
-        publishLiveMetric("download", data.mbps);
-      } else if (type === "onUploadSample") {
-        setGauge(data.mbps, "UPLOAD");
-        pushGraphSample("up", data.mbps);
-        publishLiveMetric("upload", data.mbps);
-      } else if (type === "onLatencyDetail") {
-        // The latency phase is over, so its three metrics settle now rather
-        // than waiting for the whole run: they are finished readings, and a
-        // badge that still says "measuring" through the download is stale.
-        renderLatencyPanel(data);
-        publishMetric("ping", data.ping);
-        publishMetric("jitter", data.jitter);
-        publishMetric("loss", data.loss);
-        const debugPre = qs("#debugLatencyArray");
-        if (debugPre) debugPre.textContent = JSON.stringify(data.samples, null, 2);
-      } else if (type === "onBufferbloat") {
-        // Null when too few probes survived the saturated link to grade it.
-        // Reading `.increase` off that null used to throw inside this handler
-        // and kill the rest of the run silently.
-        renderBufferbloat(data);
-        publishMetric("bufferbloat", data ? data.increase : null);
-      } else if (type === "complete") {
-        const outcome = data;
-        stopGraph();
-        Object.assign(state, {
-          download: outcome.result.download,
-          upload: outcome.result.upload,
-          ping: outcome.result.ping,
-          jitter: outcome.result.jitter,
-          loss: outcome.result.loss,
-          dns: outcome.result.dns,
-          stability: outcome.result.stability,
-          bufferbloat: outcome.bufferbloat,
-        });
-
-        // Settle every badge against the value that actually came back. Upload
-        // is the one metric a run is allowed to finish without, and the outcome
-        // carries the reason — so it settles to "failed" with an explanation
-        // rather than silently to "unavailable".
-        publishMetric("download", state.download, MetricState.ERROR);
-        publishMetric("upload", state.upload, outcome.uploadNote ? MetricState.ERROR : MetricState.UNAVAILABLE);
-        publishMetric("ping", state.ping);
-        publishMetric("jitter", state.jitter);
-        publishMetric("loss", state.loss);
-        publishMetric("dns", state.dns);
-        publishMetric("stability", state.stability);
-        publishMetric("bufferbloat", state.bufferbloat ? state.bufferbloat.increase : null);
-
-        updateScores();
-        setGauge(isMeasured(state.download) ? state.download : 0, "DOWNLOAD");
-        showGauge("done");
-
-        saveHistoryEntry({
-          at: Date.now(),
-          download: state.download,
-          upload: state.upload,
-          ping: state.ping,
-          isp: state.network ? state.network.isp : null,
-          edgeCity: state.network ? state.network.edgeCity : null,
-        });
-        renderHistory();
-
-        log("complete", outcome.result);
-        // The note names the one metric that could not be produced, so the
-        // finished state does not read as a clean sweep when it was not.
-        status.textContent = outcome.uploadNote
-          ? `Finished, but the upload could not be measured (${outcome.uploadNote}). Everything else on screen is a real reading. WiFi health score: ${state.health}/100.`
-          : `Finished. WiFi health score: ${state.health}/100. Result card, link and sharing ready.`;
-
-        const aiDoctor = qs("#aiDoctorPanel");
-        if (aiDoctor && state.download !== null) {
-          const diagnosis = generateAiDiagnosis(state, state.bufferbloat);
-          const sum = qs("#aiDoctorSummary");
-          if (sum) {
-            sum.textContent = diagnosis.summary;
-            sum.classList.remove("shimmer-placeholder");
-          }
-          const recs = qs("#aiDoctorRecommendations");
-          if (recs) {
-            recs.innerHTML = diagnosis.recommendations
-              .map((rec) => `<div style="display: flex; gap: 8px; font-size: 0.88rem; color: var(--muted);"><span style="color: var(--teal);">•</span><span>${rec}</span></div>`)
-              .join("");
-          }
-          aiDoctor.hidden = false;
-        }
-        qs(".gauge-stage")?.classList.remove("active");
-        testRunning = false;
-        qs("#stopTest").hidden = true;
-      } else if (type === "aborted") {
-        endRun();
-        // Cancellation invalidates every partial reading on screen. Leaving a
-        // half-measured download visible would present the first two seconds of
-        // a transfer as the connection's speed.
-        resetMetricCards();
-        status.textContent = "Test cancelled. No result was recorded — press GO to run a fresh measurement.";
-      } else if (type === "error") {
-        endRun();
-        logError("run failed", data.message);
-        // Whatever phase was in flight has no honest value. Anything already
-        // settled to MEASURED keeps its badge, because those readings did land.
-        for (const key of METRIC_KEYS) {
-          if (metricStates[key] === MetricState.TESTING) setMetricState([key], MetricState.ERROR);
-        }
-        status.textContent = describeFailure(data.message);
-        const debugErrors = qs("#debugErrorsList");
-        if (debugErrors) {
-          const li = document.createElement("li");
-          li.textContent = data.message;
-          debugErrors.appendChild(li);
-        }
-      }
-    };
-
+    activeWorker.onmessage = onWorkerMessage;
     activeWorker.postMessage({ type: "start" });
+
+    // ---- Then paint ------------------------------------------------------
+    if (degradedBanner) degradedBanner.hidden = true;
+    if (progress) progress.style.width = "0%";
+    if (status) status.textContent = t("statusStarting");
+    announce(t("statusStarting"));
+
+    dialStops = [...BASE_STOPS];
+    const ticks = qs("#dialTicks");
+    if (ticks) ticks.innerHTML = "";
+    renderDialTicks();
+    setInstrumentState("running");
+    setPhaseRail("select");
+    setDial(0, "—", t("phaseFinding"), "ms", "ping");
+    const note = qs("#dialNote");
+    if (note) note.textContent = t("noteFinding");
+
+    resetRunUi();
+    coreMeasurementPriority(true);
+    corePhase("latency", { intensity: 0.3, noise: 0 });
   } catch (error) {
     logError("could not start run", error);
     failRun(`The measurement engine could not start (${error.message}).`);
+  }
+}
+
+/**
+ * Everything the worker reports, in one place.
+ *
+ * Split out of `runSpeedTest` so the start path is only the four lines that
+ * actually start a measurement, and so this can be read as what it is: a state
+ * machine over the run.
+ */
+function onWorkerMessage(event) {
+  const { type, data } = event.data;
+  const status = qs("#testStatus");
+  const progress = qs("#testProgress");
+
+  if (type === "onPhase") {
+    if (status) status.textContent = PHASE_COPY[data] || `Running ${data}...`;
+    announce(PHASE_COPY[data] || String(data));
+    setPhaseRail(data);
+    const note = qs("#dialNote");
+    if (note) note.textContent = PHASE_NOTE[data] || "";
+
+    // Entering a phase puts its metrics on "measuring", which is what makes the
+    // badge tell the truth mid-run instead of pre-claiming a result.
+    if (data === "latency") {
+      setMetricState(["ping", "jitter", "loss", "dns"], MetricState.TESTING);
+      setDial(0, "—", t("phasePing"), "ms", "ping");
+      corePhase("latency", { intensity: 0.35 });
+    }
+    if (data === "download") {
+      setMetricState(["download", "bufferbloat"], MetricState.TESTING);
+      corePhase("download", { intensity: 0.35 });
+    }
+    if (data === "upload") {
+      setMetricState(["upload", "stability"], MetricState.TESTING);
+      corePhase("upload", { intensity: 0.3 });
+    }
+    return;
+  }
+
+  if (type === "onProgress") {
+    if (progress) progress.style.width = `${clamp(data, 0, 100)}%`;
+    return;
+  }
+
+  if (type === "onMetric") {
+    // Running values during a phase: shown live, badge stays "measuring".
+    for (const key of ["ping", "jitter", "loss", "dns", "download", "upload", "stability"]) {
+      if (data[key] !== undefined) publishLiveMetric(key, data[key]);
+    }
+    // Stability is the last thing the engine derives, after the upload window
+    // closes — so it is a real signal that the run has reached its final step.
+    if (data.stability !== undefined && data.stability !== null) setPhaseRail("stability");
+    return;
+  }
+
+  if (type === "onEdge") {
+    state.edgeLabel = data.label;
+    setEdgeLabel(data.label);
+    return;
+  }
+
+  if (type === "onFallback") {
+    const banner = qs("#degradedBanner");
+    const reason = qs("#degradedReason");
+    if (banner && reason) {
+      banner.hidden = false;
+      reason.textContent = `${data.name || "Primary edge"} failed (${data.error}). Measuring against the next edge instead.`;
+    }
+    state.degraded = true;
+    return;
+  }
+
+  if (type === "onLatencyProbe") {
+    if (data.lastRtt !== null && Number.isFinite(data.lastRtt)) {
+      // The arc is progress through the probe budget; the number is real
+      // milliseconds. Two different things, deliberately.
+      setDial(clamp(data.done / Math.max(1, data.all), 0, 1), data.lastRtt.toFixed(0), t("phasePing"), "ms", "ping");
+      pushGraphSample("ping", data.lastRtt);
+      corePulse();
+    }
+    return;
+  }
+
+  if (type === "onDownloadSample") {
+    setDialSpeed(data.mbps, "down");
+    pushGraphSample("down", data.mbps);
+    publishLiveMetric("download", data.mbps);
+    networkCore?.setIntensity(coreIntensity(data.mbps));
+    return;
+  }
+
+  if (type === "onUploadSample") {
+    setDialSpeed(data.mbps, "up");
+    pushGraphSample("up", data.mbps);
+    publishLiveMetric("upload", data.mbps);
+    networkCore?.setIntensity(coreIntensity(data.mbps));
+    return;
+  }
+
+  if (type === "onLatencyDetail") {
+    // The latency phase is over, so its metrics settle now rather than waiting
+    // for the whole run: they are finished readings, and a badge that still
+    // says "measuring" through the download is stale.
+    renderLatencyPanel(data);
+    publishMetric("ping", data.ping);
+    publishMetric("jitter", data.jitter);
+    publishMetric("loss", data.loss);
+    // The flow frays in proportion to how irregular the link actually is.
+    const jitter = Number.isFinite(data.jitter) ? data.jitter : 0;
+    const loss = Number.isFinite(data.loss) ? data.loss : 0;
+    coreNoise(clamp(jitter / 45 + loss / 12, 0, 1));
+    // The report starts filling in as soon as there is something real in it,
+    // rather than appearing all at once at the end.
+    revealReport();
+    const debugPre = qs("#debugLatencyArray");
+    if (debugPre) debugPre.textContent = JSON.stringify(data.samples, null, 2);
+    return;
+  }
+
+  if (type === "onBufferbloat") {
+    // Null when too few probes survived the saturated link to grade it.
+    state.downloadBloat = data;
+    renderBufferbloat(data);
+    publishMetric("bufferbloat", data ? data.increase : null);
+    return;
+  }
+
+  if (type === "onUploadBufferbloat") {
+    // Latency under UPLOAD load — frequently the worse of the two on an
+    // asymmetric line, and the one that breaks a call while photos back up.
+    state.uploadBloat = data;
+    const worse =
+      state.downloadBloat && data
+        ? data.increase > state.downloadBloat.increase
+          ? data
+          : state.downloadBloat
+        : data || state.downloadBloat;
+    if (worse) {
+      renderBufferbloat(worse);
+      publishMetric("bufferbloat", worse.increase);
+    }
+    return;
+  }
+
+  if (type === "complete") {
+    completeRun(data);
+    return;
+  }
+
+  if (type === "aborted") {
+    endRun();
+    // Cancellation invalidates every partial reading on screen. Leaving a
+    // half-measured download visible would present the first two seconds of a
+    // transfer as the connection's speed.
+    resetRunUi();
+    if (status) status.textContent = t("statusCancelled");
+    announce(t("statusCancelled"));
+    return;
+  }
+
+  if (type === "error") {
+    endRun();
+    logError("run failed", data.message);
+    // Whatever phase was in flight has no honest value. Anything already
+    // settled to MEASURED keeps its badge, because those readings did land.
+    for (const key of METRIC_KEYS) {
+      if (metricStates[key] === MetricState.TESTING) setMetricState([key], MetricState.ERROR);
+    }
+    const message = describeFailure(data.message);
+    if (status) status.textContent = message;
+    announce(message);
+    const debugErrors = qs("#debugErrorsList");
+    if (debugErrors) {
+      const li = document.createElement("li");
+      li.textContent = data.message;
+      debugErrors.appendChild(li);
+    }
+  }
+}
+
+/**
+ * Everything about the finished run, assembled once.
+ *
+ * One function builds this so the technical drawer, the exported JSON and any
+ * future export cannot drift into describing the same run differently. Nothing
+ * identifying goes in: the client string is the browser and platform the
+ * measurement was taken on, which changes how a result should be read, and the
+ * IP address is not here because it explains nothing about the numbers.
+ *
+ * @returns {object}
+ */
+function measurementRecord() {
+  return {
+    at: Date.now(),
+    edgeLabel: state.edgeLabel,
+    client: state.network ? `${state.network.browser} · ${state.network.os} · ${state.network.device}` : null,
+    result: {
+      download: state.download,
+      upload: state.upload,
+      ping: state.ping,
+      jitter: state.jitter,
+      loss: state.loss,
+      dns: state.dns,
+      stability: state.stability,
+    },
+    quality: state.quality,
+    evidence: state.evidence,
+    bufferbloat: state.bufferbloat,
+    downloadBloat: state.downloadBloat,
+    uploadBloat: state.uploadBloat,
+    uploadNote: state.uploadNote,
+    metricStates: { ...metricStates },
+    healthScore: state.health,
+  };
+}
+
+/** @param {object} outcome */
+function completeRun(outcome) {
+  const status = qs("#testStatus");
+  setPhaseRail("analyse");
+
+  Object.assign(state, {
+    quality: outcome.quality ?? null,
+    evidence: outcome.evidence ?? null,
+    downloadBloat: outcome.downloadBloat ?? null,
+    uploadBloat: outcome.uploadBloat ?? null,
+    uploadNote: outcome.uploadNote ?? null,
+    download: outcome.result.download,
+    upload: outcome.result.upload,
+    ping: outcome.result.ping,
+    jitter: outcome.result.jitter,
+    loss: outcome.result.loss,
+    dns: outcome.result.dns,
+    stability: outcome.result.stability,
+    bufferbloat: outcome.bufferbloat,
+  });
+
+  // Settle every badge against the value that actually came back. Upload is the
+  // one metric a run is allowed to finish without, and the outcome carries the
+  // reason — so it settles to "failed" with an explanation rather than silently
+  // to "unavailable".
+  publishMetric("download", state.download, MetricState.ERROR);
+  publishMetric("upload", state.upload, outcome.uploadNote ? MetricState.ERROR : MetricState.UNAVAILABLE);
+  publishMetric("ping", state.ping);
+  publishMetric("jitter", state.jitter);
+  publishMetric("loss", state.loss);
+  publishMetric("dns", state.dns);
+  publishMetric("stability", state.stability);
+  publishMetric("bufferbloat", state.bufferbloat ? state.bufferbloat.increase : null);
+
+  coreMeasurementPriority(false);
+
+  // What the run is willing to claim for itself, and the record that backs it.
+  renderQuality(state.quality);
+  renderTechnical(measurementRecord());
+
+  updateScores();
+  setDialSpeed(isMeasured(state.download) ? state.download : 0, "down");
+  setInstrumentState("done");
+  setPhaseRail(null, true);
+  corePhase("idle", { intensity: 0.2 });
+
+  const note = qs("#dialNote");
+  if (note) note.textContent = t("noteDone");
+
+  saveHistoryEntry({
+    at: Date.now(),
+    download: state.download,
+    upload: state.upload,
+    ping: state.ping,
+    isp: state.network ? state.network.isp : null,
+    edgeCity: state.network ? state.network.edgeCity : null,
+  });
+  renderHistory();
+  revealReport();
+
+  log("complete", outcome.result);
+  // The note names the one metric that could not be produced, so the finished
+  // state does not read as a clean sweep when it was not.
+  // `state.health` is null when the run could not be scored, and interpolating
+  // that read "Connection health null/100 — —" to every user and every screen
+  // reader on the aria-live channel.
+  const band = healthBand(state.health);
+  const scored = typeof state.health === "number" && Number.isFinite(state.health);
+  const message = !scored
+    ? "Finished, but this run could not be scored — the latency phase returned too few probes. The figures that were measured are shown below."
+    : outcome.uploadNote
+      ? `Finished, but the upload could not be measured (${outcome.uploadNote}). Everything else on screen is a real reading. Health ${state.health}/100.`
+      : `Finished. Connection health ${state.health}/100 — ${band.grade}. Result card, link and sharing are ready below.`;
+  if (status) status.textContent = message;
+  announce(message);
+
+  releaseWorker();
+  testRunning = false;
+
+  // Take the reader to the report, once, and only if they have not already
+  // scrolled somewhere themselves. Hijacking a scroll a person started is worse
+  // than making them scroll.
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (!reduced) {
+    window.setTimeout(() => {
+      const results = qs("#results");
+      if (results && !results.hidden) results.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 700);
   }
 }
 
@@ -1231,12 +1866,12 @@ function endRun({ release = true } = {}) {
   // Releasing here rather than at each call site is what guarantees no run —
   // finished, failed or cancelled — leaves a thread alive holding open sockets.
   if (release) releaseWorker();
-  stopGraph();
+  coreMeasurementPriority(false);
   const progress = qs("#testProgress");
   if (progress) progress.style.width = "0%";
-  showGauge("idle");
-  qs("#stopTest").hidden = true;
-  qs(".gauge-stage")?.classList.remove("active");
+  setInstrumentState("idle");
+  setPhaseRail(null);
+  corePhase("idle", { intensity: 0.16, noise: 0 });
   testRunning = false;
 }
 
@@ -1250,23 +1885,17 @@ function failRun(message) {
     activeWorker.terminate();
     activeWorker = null;
   }
-  endRun();
-  resetMetricCards();
-  qs("#testStatus").textContent = message;
+  endRun({ release: false });
+  const status = qs("#testStatus");
+  if (status) status.textContent = message;
+  announce(message);
+  logError("run aborted", message);
 }
 
-/**
- * Turn an engine error into something that says what to do about it. A raw
- * "Failed to fetch" tells the user nothing; whether they are offline, blocked,
- * or looking at a dead edge changes the answer entirely.
- *
- * @param {string} message
- * @returns {string}
- */
 function describeFailure(message) {
   const raw = String(message || "");
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return "Test failed: this device is offline. Reconnect and press GO again.";
+    return "Test failed: this device is offline. Reconnect and press Start again.";
   }
   if (/no latency samples/i.test(raw)) {
     return "Test failed: no latency probe reached the measurement edge. A VPN, firewall or ad blocker may be blocking speed.cloudflare.com.";
@@ -1324,8 +1953,10 @@ function stopSpeedTest() {
   // appear to hang while the streams unwind. The worker stays alive until it
   // acknowledges, or until the grace timer above kills it.
   endRun({ release: false });
-  resetMetricCards();
-  qs("#testStatus").textContent = "Test cancelled. No result was recorded — press GO to run a fresh measurement.";
+  resetRunUi();
+  const status = qs("#testStatus");
+  if (status) status.textContent = t("statusCancelled");
+  announce(t("statusCancelled"));
 }
 
 /** Release the worker once it has finished with it. */
@@ -1364,9 +1995,13 @@ function updatePingCalculator() {
 }
 
 function shareResult() {
-  const up = state.upload === null ? "upload n/a" : `${state.upload.toFixed(1)} Mbps up`;
+  // Every one of these can be null on a partial run, and only `upload` was
+  // guarded — so a shared result read "…, null ms ping, null ms jitter." in
+  // somebody else's chat window.
+  const say = (value, unit) => (Number.isFinite(value) ? `${value} ${unit}` : `${unit} not measured`);
+  const up = state.upload === null ? "upload not measured" : `${state.upload.toFixed(1)} Mbps up`;
   const text = state.download
-    ? `WifiPlus Speed Test Result: ${state.download.toFixed(1)} Mbps down, ${up}, ${state.ping} ms ping, ${state.jitter} ms jitter.`
+    ? `WifiPlus Speed Test Result: ${state.download.toFixed(1)} Mbps down, ${up}, ${say(state.ping, "ms ping")}, ${say(state.jitter, "ms jitter")}.`
     : "Test your internet speed with WifiPlus.";
   if (navigator.share) {
     navigator.share({ title: "WifiPlus Speed Test Result", text, url: location.href.split("#")[0] }).catch(() => {});
@@ -1377,149 +2012,65 @@ function shareResult() {
 }
 
 function copyResultJson() {
+  const status = qs("#testStatus");
   if (state.download === null) {
-    qs("#testStatus").textContent = "Nothing to copy yet — press GO to measure your connection first.";
+    if (status) status.textContent = "Nothing to copy yet — press Start to measure your connection first.";
     return;
   }
-  const fullResult = {
-    timestamp: new Date().toISOString(),
-    userAgent: navigator.userAgent,
-    network: state.network,
-    metrics: {
-      downloadMbps: state.download,
-      uploadMbps: state.upload,
-      pingMs: state.ping,
-      jitterMs: state.jitter,
-      packetLossPct: state.loss,
-      dnsMs: state.dns,
-      stabilityScore: state.stability,
-      bufferbloat: state.bufferbloat,
-    },
-    // Exported so a shared result carries its own provenance: a reader can see
-    // which figures were measured and which were unavailable, instead of having
-    // to infer it from a null.
-    metricStates: { ...metricStates },
-    healthScore: state.health,
-  };
-  const jsonString = JSON.stringify(fullResult, null, 2);
+  // The full record, not a summary. A result that cannot be recomputed from
+  // what it carries is a claim rather than a measurement, and the per-metric
+  // states travel with it so a reader can see which figures were measured and
+  // which were unavailable instead of inferring it from a null.
+  const jsonString = JSON.stringify(
+    { schema: "wifiplus.measurement/2", userAgent: navigator.userAgent, ...measurementRecord() },
+    null,
+    2,
+  );
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(jsonString).then(() => {
-      qs("#testStatus").textContent = "Full reproducible test results copied to clipboard as JSON.";
-    }).catch(() => {
-      qs("#testStatus").textContent = jsonString;
-    });
-  } else {
-    qs("#testStatus").textContent = jsonString;
+    navigator.clipboard
+      .writeText(jsonString)
+      .then(() => {
+        if (status) status.textContent = "Full measurement record copied as JSON — bytes, spans, sample counts and every check the run ran on itself.";
+      })
+      .catch(() => {
+        if (status) status.textContent = jsonString;
+      });
+  } else if (status) {
+    status.textContent = jsonString;
   }
 }
 
-function downloadResultCard() {
+/**
+ * Export the result as an image.
+ *
+ * The renderer is imported on demand: it is only ever needed after a run, and
+ * loading it up front would put a module on the critical path of a page whose
+ * whole promise is being fast.
+ */
+async function downloadResultCard() {
+  const status = qs("#testStatus");
   if (state.download === null) {
-    qs("#testStatus").textContent = "No result to put on a card yet — press GO to measure your connection first.";
+    if (status) status.textContent = "No result to put on a card yet — press Start to measure your connection first.";
     return;
   }
-  const canvas = document.createElement("canvas");
-  canvas.width = 1200;
-  canvas.height = 630;
-  const ctx = canvas.getContext("2d");
-
-  // Background
-  const grad = ctx.createLinearGradient(0, 0, 1200, 630);
-  grad.addColorStop(0, "#06090f");
-  grad.addColorStop(1, "#10131a");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 1200, 630);
-
-  // Top accent bar
-  ctx.fillStyle = "#00f2ff";
-  ctx.fillRect(0, 0, 1200, 8);
-
-  // Header Title & Subtitle
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "800 42px Inter, system-ui, sans-serif";
-  ctx.fillText("WifiPlus Speed Test Result", 60, 75);
-
-  ctx.fillStyle = "#849495";
-  ctx.font = "600 18px Inter, system-ui, sans-serif";
-  const when = new Date().toLocaleString();
-  ctx.fillText(`Real browser network measurement · ${when}`, 60, 110);
-
-  // Metric Tiles Grid (8 tiles).
-  //
-  // Badges come from the live state map, not from a literal. These fell back to
-  // a hardcoded "measured" against `state.badges`, an object nothing ever
-  // assigned — so an exported card stamped "measured" on an em dash, and the
-  // card is the artefact most likely to be shared with someone who never saw
-  // the run.
-  const tile = (label, key, format, color) => ({
-    label,
-    val: isMeasured(state[key]) ? format(state[key]) : "—",
-    badge: BADGE_TEXT[metricStates[key]] ?? BADGE_TEXT[MetricState.NOT_STARTED],
-    color,
-  });
-
-  const tiles = [
-    tile("DOWNLOAD", "download", (v) => `${v.toFixed(1)} Mbps`, "#57a6ff"),
-    tile("UPLOAD", "upload", (v) => `${v.toFixed(1)} Mbps`, "#24d1c3"),
-    tile("PING", "ping", (v) => `${v} ms`, "#f59e0b"),
-    tile("JITTER", "jitter", (v) => `${v.toFixed(1)} ms`, "#a855f7"),
-    tile("PACKET LOSS", "loss", (v) => `${v}%`, "#ef4444"),
-    tile("DNS LATENCY", "dns", (v) => `${v} ms`, "#38bdf8"),
-    tile("STABILITY", "stability", (v) => `${v}%`, "#22c55e"),
-    {
-      label: "LOADED LATENCY",
-      val: state.bufferbloat ? `+${state.bufferbloat.increase}ms (${state.bufferbloat.grade})` : "—",
-      badge: BADGE_TEXT[metricStates.bufferbloat] ?? BADGE_TEXT[MetricState.NOT_STARTED],
-      color: "#00f2ff",
-    },
-  ];
-
-  tiles.forEach((tile, i) => {
-    const col = i % 4;
-    const row = Math.floor(i / 4);
-    const x = 60 + col * 265;
-    const y = 145 + row * 180;
-    const w = 245;
-    const h = 155;
-
-    ctx.fillStyle = "rgba(16, 25, 38, 0.75)";
-    ctx.strokeStyle = "rgba(0, 242, 255, 0.2)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 14);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = "#849495";
-    ctx.font = "800 13px Inter, system-ui, sans-serif";
-    ctx.fillText(tile.label, x + 16, y + 32);
-
-    // Badge
-    const isMeas = tile.badge === "measured";
-    ctx.fillStyle = isMeas ? "rgba(0, 242, 255, 0.15)" : "rgba(255, 179, 0, 0.15)";
-    ctx.beginPath();
-    ctx.roundRect(x + w - 85, y + 16, 70, 20, 10);
-    ctx.fill();
-
-    ctx.fillStyle = isMeas ? "#00f2ff" : "#ffb300";
-    ctx.font = "700 11px Inter, system-ui, sans-serif";
-    ctx.fillText(tile.badge, x + w - 75, y + 30);
-
-    // Value
-    ctx.fillStyle = tile.color;
-    ctx.font = "800 28px Outfit, sans-serif";
-    ctx.fillText(tile.val, x + 16, y + 95);
-  });
-
-  // Footer branding
-  ctx.fillStyle = "#849495";
-  ctx.font = "600 16px Inter, system-ui, sans-serif";
-  ctx.fillText("https://wifiplus.prathamgosai.in/ — End-to-end browser speed measurement engine", 60, 580);
-
-  const link = document.createElement("a");
-  link.download = `wifiplus-speedtest-${Date.now()}.png`;
-  link.href = canvas.toDataURL("image/png");
-  link.click();
+  try {
+    const { drawResultCard } = await import("./ui/result-card.js");
+    const canvas = await drawResultCard(state, {
+      score: state.health,
+      bufferbloat: state.bufferbloat || null,
+      states: metricStates,
+      isp: state.network ? state.network.isp : null,
+      edge: state.edgeLabel || (state.network ? state.network.edgeCity : null),
+    });
+    const link = document.createElement("a");
+    link.download = `wifiplus-${new Date().toISOString().slice(0, 10)}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+    if (status) status.textContent = "Result card saved. It carries the same badges as this page — nothing on it claims more than was measured.";
+  } catch (error) {
+    logError("result card", error);
+    if (status) status.textContent = `The result card could not be generated (${error.message}).`;
+  }
 }
 
 // The `accept` attribute is a file-picker hint, not a guarantee — re-check the
@@ -1666,13 +2217,30 @@ function applyLanguage(requested) {
   // Persisted values are attacker-writable in a shared browser; only ever apply
   // a language we actually ship, so nothing arbitrary reaches the lang attribute.
   const language = Object.prototype.hasOwnProperty.call(translations, requested) ? requested : "en";
-  const active = translations[language];
+  activeLanguage = language;
   document.documentElement.lang = language;
   document.documentElement.dir = ["ar", "ur"].includes(language) ? "rtl" : "ltr";
+
+  // A key with no entry anywhere leaves the element untouched. Falling back to
+  // the key name is how a report ends up displaying "pathNote" to a reader.
   qsa("[data-i18n]").forEach((element) => {
-    const key = element.dataset.i18n;
-    if (active[key]) element.textContent = active[key];
+    const value = lookup(element.dataset.i18n);
+    if (value !== undefined) element.textContent = value;
   });
+  // Two strings carry inline emphasis. They come from the constant table above,
+  // never from anything a user or a server supplied, which is the only reason
+  // setting innerHTML here is safe — and the reason the attribute is separate
+  // rather than a flag on the ordinary one.
+  qsa("[data-i18n-html]").forEach((element) => {
+    const value = lookup(element.dataset.i18nHtml);
+    if (value !== undefined) element.innerHTML = value;
+  });
+
+  // Anything the interface says while a run is idle has to be re-said in the
+  // new language; anything mid-run keeps the wording the run produced.
+  if (!testRunning) {
+    setInstrumentState(qs("#results")?.hidden === false ? "done" : "idle");
+  }
   localStorage.setItem("wifiplus-language", language);
 }
 
@@ -1681,34 +2249,14 @@ function initTheme() {
   if (saved === "dark" || saved === "light") document.documentElement.dataset.theme = saved;
 }
 
-function updatePlatformNotice() {
-  const notice = qs("#platformNotice");
-  const userAgent = navigator.userAgent || "";
-  const platform = navigator.platform || "";
-  const isApple = /Mac|iPhone|iPad|iPod/.test(userAgent) || /Mac|iPhone|iPad|iPod/.test(platform);
-  const isLinux = /Linux|X11|Unix/.test(userAgent) || /Linux|X11|Unix/.test(platform);
-  const isWindows = /Windows|Win32|Win64/.test(userAgent) || /Windows|Win32|Win64/.test(platform);
-  const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(userAgent);
-
-  if (notice) {
-    if (isApple) {
-      notice.textContent = "Optimized for Apple devices and macOS with install support in Safari and supported browsers.";
-    } else if (isLinux) {
-      notice.textContent = "Optimized for Linux and Unix-like systems with a desktop-friendly layout and app-style install support.";
-    } else if (isWindows) {
-      notice.textContent = "Optimized for Windows desktop and browser-based app install workflows.";
-    } else if (isMobile) {
-      notice.textContent = "Optimized for phones and tablets with touch-friendly controls and home-screen installation.";
-    } else {
-      notice.textContent = "Cross-platform ready for desktop, mobile, macOS, Windows, Linux, and Unix-like systems.";
-    }
-  }
-}
-
 function toggleTheme() {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;
   localStorage.setItem("wifiplus-theme", next);
+  // A canvas cannot inherit CSS, so both the 3D scene and the sparklines have to
+  // be told the palette changed or they keep the old theme's colours.
+  networkCore?.refreshTheme();
+  redrawSparklines();
 }
 
 function registerServiceWorker() {
@@ -1719,167 +2267,284 @@ function registerServiceWorker() {
 
 let deferredInstallPrompt = null;
 
+/**
+ * Install, offered once and from one place.
+ *
+ * The old hero carried a permanently visible "Install App" button that did
+ * nothing at all in browsers that never fire `beforeinstallprompt` — which is
+ * most of them. The banner below only appears when there is a real prompt to
+ * show, and remembers being dismissed.
+ */
 function setupInstallPrompt() {
-  const installButton = qs("#installAppButton");
-  if (!installButton) return;
+  const banner = qs("#installPromptBanner");
+  const accept = qs("#installPromptAccept");
+  const dismiss = qs("#installPromptDismiss");
+  if (!banner || !accept || !dismiss) return;
+
+  const DISMISS_KEY = "wifiplus-install-dismissed";
 
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     deferredInstallPrompt = event;
-    installButton.hidden = false;
-    installButton.textContent = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? "Install on Apple device" : "Install App";
+    if (localStorage.getItem(DISMISS_KEY) === "1") return;
+    // Not during a run: a banner sliding in mid-measurement is a layout shift
+    // on the one screen that must not move.
+    window.setTimeout(() => {
+      if (!testRunning) banner.hidden = false;
+    }, 6000);
   });
 
   window.addEventListener("appinstalled", () => {
-    installButton.hidden = true;
-    installButton.textContent = "Installed";
+    banner.hidden = true;
+    deferredInstallPrompt = null;
   });
 
-  installButton.addEventListener("click", async () => {
-    if (!deferredInstallPrompt) {
-      qs("#testStatus").textContent = "Use your browser's Share or Install option to add WifiPlus to your home screen or desktop.";
-      return;
-    }
+  dismiss.addEventListener("click", () => {
+    banner.hidden = true;
+    localStorage.setItem(DISMISS_KEY, "1");
+  });
 
+  accept.addEventListener("click", async () => {
+    banner.hidden = true;
+    if (!deferredInstallPrompt) return;
     deferredInstallPrompt.prompt();
-    const choice = await deferredInstallPrompt.userChoice;
-    if (choice.outcome === "accepted") {
-      installButton.hidden = true;
-      qs("#testStatus").textContent = "WifiPlus is now installed for quick access.";
-    }
+    await deferredInstallPrompt.userChoice.catch(() => {});
     deferredInstallPrompt = null;
   });
 }
 
+/** The header only materialises once the page has actually moved. */
+function setupHeader() {
+  const header = qs(".site-header");
+  if (!header) return;
+  const sentinel = document.createElement("div");
+  sentinel.setAttribute("aria-hidden", "true");
+  sentinel.style.cssText = "position:absolute;top:0;height:1px;width:1px;";
+  document.body.prepend(sentinel);
+  if (typeof IntersectionObserver === "undefined") {
+    header.classList.add("stuck");
+    return;
+  }
+  new IntersectionObserver(
+    ([entry]) => header.classList.toggle("stuck", !entry.isIntersecting),
+    { threshold: 0 },
+  ).observe(sentinel);
+}
+
 function bindEvents() {
-  qs("#menuButton").addEventListener("click", () => {
-    const isOpen = qs("#navLinks").classList.toggle("open");
+  const on = (selector, event, handler, options) => {
+    const el = qs(selector);
+    if (el) el.addEventListener(event, handler, options);
+  };
+
+  on("#menuButton", "click", () => {
+    const nav = qs("#navLinks");
+    const isOpen = nav.classList.toggle("open");
     document.body.classList.toggle("menu-open", isOpen);
     qs("#menuButton").setAttribute("aria-expanded", String(isOpen));
   });
-  qsa(".nav-links a").forEach((link) => link.addEventListener("click", () => {
-    qs("#navLinks").classList.remove("open");
-    document.body.classList.remove("menu-open");
-    qs("#menuButton").setAttribute("aria-expanded", "false");
-  }));
-  qs("#themeToggle").addEventListener("click", toggleTheme);
-  qs("#languageSelect").addEventListener("change", (event) => applyLanguage(event.target.value));
-  qs("#countrySelect").addEventListener("change", () => { state.scopedGlobal = false; updateCityOptions(); });
-  qs("#citySelect").addEventListener("change", () => { state.scopedGlobal = false; updateProviderOptions(); });
-  qs("#providerSelect").addEventListener("change", renderSelectedProvider);
-  qs("#sortSelect").addEventListener("change", renderComparison);
-  qs("#globalScopeButton").addEventListener("click", () => {
-    state.scopedGlobal = !state.scopedGlobal;
-    qs("#globalScopeButton").textContent = state.scopedGlobal ? "Show Selected City" : "Show Worldwide";
-    renderComparison();
-    renderAvailability();
+  qsa(".nav-links a").forEach((link) =>
+    link.addEventListener("click", () => {
+      qs("#navLinks")?.classList.remove("open");
+      document.body.classList.remove("menu-open");
+      qs("#menuButton")?.setAttribute("aria-expanded", "false");
+    }),
+  );
+  // Escape closes the mobile menu, because a full-screen overlay with no
+  // keyboard exit is a trap.
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (qs("#navLinks")?.classList.contains("open")) {
+      qs("#navLinks").classList.remove("open");
+      document.body.classList.remove("menu-open");
+      qs("#menuButton")?.setAttribute("aria-expanded", "false");
+      qs("#menuButton")?.focus();
+    }
   });
-  qsa(".tab-button").forEach((button) => button.addEventListener("click", () => {
-    qsa(".tab-button").forEach((tab) => tab.classList.remove("active"));
-    button.classList.add("active");
-    state.ranking = button.dataset.rank;
-    renderRankings();
-  }));
-  qs("#recCountry").addEventListener("change", updateRecCityOptions);
-  qs("#recommendButton").addEventListener("click", recommendProviders);
-  ["#gamingNeed", "#streamingNeed"].forEach((selector) => qs(selector).addEventListener("input", () => {
-    qs(`${selector}Label`).textContent = qs(selector).value;
-  }));
-  ["#devices", "#streams", "#gamers", "#workers"].forEach((selector) => qs(selector).addEventListener("input", updateBandwidth));
-  qs("#gameSelect").addEventListener("change", updatePingCalculator);
-  qs("#pingInput").addEventListener("input", updatePingCalculator);
-  // Badges reflect "not tested" from the moment the page paints, rather than
-  // inheriting whatever the markup shipped with.
-  resetMetricCards();
-  qs("#goButton").addEventListener("click", runSpeedTest);
-  qs("#stopTest").addEventListener("click", stopSpeedTest);
+
+  on("#themeToggle", "click", toggleTheme);
+  on("#languageSelect", "change", (event) => applyLanguage(event.target.value));
+
+  // ---- The test -----------------------------------------------------------
+  const go = qs("#goButton");
+  if (go) {
+    go.addEventListener("click", () => {
+      if (testRunning) return;
+      runSpeedTest();
+      // Purely a response to the press. The worker already has its start
+      // message by the time this class lands.
+      go.classList.remove("pressed");
+      void go.offsetWidth;
+      go.classList.add("pressed");
+      window.setTimeout(() => go.classList.remove("pressed"), 320);
+    });
+  }
+  on("#stopTest", "click", stopSpeedTest);
+  on("#bottomNavGo", "click", (event) => {
+    event.preventDefault();
+    qs("#speed-test")?.scrollIntoView({ behavior: "smooth" });
+    if (!testRunning) runSpeedTest();
+  });
+
   // Connection loss during a run invalidates the numbers still in flight, so
   // say so rather than letting a stalled transfer read as a slow link.
   window.addEventListener("offline", () => {
+    const banner = qs("#offlineBanner");
+    if (banner) banner.hidden = false;
+    activeWorker?.postMessage({ type: "offline" });
     if (testRunning) {
       logError("network", "went offline mid-run");
       stopSpeedTest();
-      qs("#testStatus").textContent =
-        "Test cancelled: this device went offline mid-measurement, so the partial readings were discarded.";
-    }
-  });
-  qs("#heroStart").addEventListener("click", (event) => {
-    event.preventDefault();
-    qs("#speed-test").scrollIntoView({ behavior: "smooth" });
-    window.setTimeout(runSpeedTest, 420);
-  });
-  qs("#downloadCard").addEventListener("click", downloadResultCard);
-  qs("#shareResult").addEventListener("click", shareResult);
-  qs("#copyResultLink").addEventListener("click", copyResultLink);
-  qs("#copyResultJson")?.addEventListener("click", copyResultJson);
-  qs("#connIp")?.addEventListener("click", () => {
-    isIpMasked = !isIpMasked;
-    qs("#connIp").textContent = formatIpDisplay(rawClientIp);
-  });
-  qs("#clearHistory").addEventListener("click", () => {
-    clearHistory();
-    renderHistory();
-  });
-  qs("#routerUpload").addEventListener("change", handleUpload);
-  qsa(".seo-jump").forEach((link) => link.addEventListener("click", (event) => {
-    const country = event.currentTarget.dataset.country;
-    const city = event.currentTarget.dataset.city;
-    if ([...qs("#countrySelect").options].some((option) => option.value === country)) {
-      qs("#countrySelect").value = country;
-      updateCityOptions();
-      if ([...qs("#citySelect").options].some((option) => option.value === city)) {
-        qs("#citySelect").value = city;
-        updateProviderOptions();
+      const status = qs("#testStatus");
+      if (status) {
+        status.textContent =
+          "Test cancelled: this device went offline mid-measurement, so the partial readings were discarded.";
       }
     }
-  }));
-
-  // Mobile Bottom Sheet Handlers
-  const backdrop = qs("#bottomSheetBackdrop");
-  const aiSheet = qs("#aiDoctorSheet");
-  const closeAiSheet = qs("#closeAiDoctorSheet");
-
-  function closeSheets() {
-    if (backdrop) backdrop.classList.remove("open");
-    qsa(".bottom-sheet").forEach(s => s.classList.remove("open"));
-  }
-
-  backdrop?.addEventListener("click", closeSheets);
-  closeAiSheet?.addEventListener("click", closeSheets);
-
-  // Bottom Nav handlers
-  qsa(".mobile-bottom-nav .nav-item").forEach((item) => {
-    item.addEventListener("click", () => {
-      qsa(".mobile-bottom-nav .nav-item").forEach((nav) => nav.classList.remove("active"));
-      item.classList.add("active");
-    });
   });
-
-  qs("#bottomNavGo")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    qs("#speed-test")?.scrollIntoView({ behavior: "smooth" });
-    runSpeedTest();
-  });
-
-  // Offline / Online status
   window.addEventListener("online", () => {
     const banner = qs("#offlineBanner");
     if (banner) banner.hidden = true;
-  });
-  window.addEventListener("offline", () => {
-    const banner = qs("#offlineBanner");
-    if (banner) banner.hidden = false;
   });
   if (typeof navigator !== "undefined" && !navigator.onLine) {
     const banner = qs("#offlineBanner");
     if (banner) banner.hidden = false;
   }
+
+  // ---- Result actions ------------------------------------------------------
+  on("#downloadCard", "click", downloadResultCard);
+  on("#shareResult", "click", shareResult);
+  on("#copyResultLink", "click", copyResultLink);
+  on("#copyResultJson", "click", copyResultJson);
+  on("#clearHistory", "click", () => {
+    clearHistory();
+    renderHistory();
+  });
+  on("#connIp", "click", () => {
+    isIpMasked = !isIpMasked;
+    qs("#connIp").textContent = formatIpDisplay(rawClientIp);
+  });
+
+  // ---- ISP intelligence and tools -----------------------------------------
+  on("#countrySelect", "change", () => { state.scopedGlobal = false; updateCityOptions(); });
+  on("#citySelect", "change", () => { state.scopedGlobal = false; updateProviderOptions(); });
+  on("#providerSelect", "change", renderSelectedProvider);
+  on("#sortSelect", "change", renderComparison);
+  on("#globalScopeButton", "click", () => {
+    state.scopedGlobal = !state.scopedGlobal;
+    qs("#globalScopeButton").textContent = state.scopedGlobal ? "Show Selected City" : "Show Worldwide";
+    renderComparison();
+    renderAvailability();
+  });
+  qsa(".tab-button").forEach((button) =>
+    button.addEventListener("click", () => {
+      qsa(".tab-button").forEach((tab) => tab.classList.remove("active"));
+      button.classList.add("active");
+      state.ranking = button.dataset.rank;
+      renderRankings();
+    }),
+  );
+  on("#recCountry", "change", updateRecCityOptions);
+  on("#recommendButton", "click", recommendProviders);
+  ["#gamingNeed", "#streamingNeed"].forEach((selector) =>
+    on(selector, "input", () => {
+      const label = qs(`${selector}Label`);
+      if (label) label.textContent = qs(selector).value;
+    }),
+  );
+  ["#devices", "#streams", "#gamers", "#workers"].forEach((selector) => on(selector, "input", updateBandwidth));
+  on("#gameSelect", "change", updatePingCalculator);
+  on("#pingInput", "input", updatePingCalculator);
+  on("#routerUpload", "change", handleUpload);
+  qsa(".seo-jump").forEach((link) =>
+    link.addEventListener("click", (event) => {
+      const country = event.currentTarget.dataset.country;
+      const city = event.currentTarget.dataset.city;
+      const countrySelect = qs("#countrySelect");
+      if (!countrySelect) return;
+      if ([...countrySelect.options].some((option) => option.value === country)) {
+        countrySelect.value = country;
+        updateCityOptions();
+        const citySelect = qs("#citySelect");
+        if (citySelect && [...citySelect.options].some((option) => option.value === city)) {
+          citySelect.value = city;
+          updateProviderOptions();
+        }
+      }
+    }),
+  );
+
+  // ---- Sheets and bottom nav ------------------------------------------------
+  const backdrop = qs("#bottomSheetBackdrop");
+  const closeSheets = () => {
+    backdrop?.classList.remove("open");
+    qsa(".bottom-sheet").forEach((sheet) => sheet.classList.remove("open"));
+    document.body.classList.remove("sheet-open");
+  };
+  backdrop?.addEventListener("click", closeSheets);
+  on("#closeAiDoctorSheet", "click", closeSheets);
+
+  qsa(".mobile-bottom-nav .nav-item").forEach((item) =>
+    item.addEventListener("click", () => {
+      qsa(".mobile-bottom-nav .nav-item").forEach((nav) => nav.classList.remove("active"));
+      item.classList.add("active");
+    }),
+  );
+
+  // Badges reflect "not tested" from the moment the page paints, rather than
+  // inheriting whatever the markup shipped with.
+  resetMetricCards();
 }
 
+/* ---------------------------------------------------------------------------
+   Boot.
+   The order below is the priority order of the page: theme (so nothing flashes),
+   then the instrument, then the identity strip, then everything that is not the
+   speed test. The 3D scene and the ISP database both load AFTER first paint —
+   neither is allowed to delay the dial.
+   ------------------------------------------------------------------------- */
 initTheme();
-updatePlatformNotice();
-setupCanvas();
+setupHeader();
+bindEvents();
+setInstrumentState("idle");
+renderDialTicks();
+
+const detectedLanguage = (navigator.language || "en").slice(0, 2);
+const savedLanguage = localStorage.getItem("wifiplus-language");
+const language = savedLanguage || (translations[detectedLanguage] ? detectedLanguage : "en");
+const languageSelect = qs("#languageSelect");
+if (languageSelect) languageSelect.value = language;
+applyLanguage(language);
+
+// Identify the connection up front so the strip is populated before anyone
+// presses Start, then restore local history and any shared result in the URL.
+renderConnection();
+renderHistory();
+applyResultFromHash();
+// A shared link opened from inside the page changes only the fragment, which is
+// a same-document navigation: the module never re-evaluates, so the result has
+// to be applied on the event as well as at boot.
+window.addEventListener("hashchange", () => {
+  if (!testRunning) applyResultFromHash();
+});
+setupInstallPrompt();
+registerServiceWorker();
+
+/**
+ * Everything that is not the speed test, deferred.
+ *
+ * The ISP database is a JSON fetch and eleven render passes for content that
+ * lives several screens down; the 3D scene is a module and a GPU context. Both
+ * used to run during boot, competing with the dial for the main thread on the
+ * one interaction the page exists for.
+ */
+function whenIdle(task, timeout = 1200) {
+  if (typeof requestIdleCallback === "function") requestIdleCallback(task, { timeout });
+  else window.setTimeout(task, 200);
+}
+
 async function initIspData() {
+  const { fetchIspData } = await import("./core/isp-data.js");
   providers = await fetchIspData();
   initLocationControls();
   renderRegions();
@@ -1889,17 +2554,33 @@ async function initIspData() {
   updatePingCalculator();
   recommendProviders();
 }
-initIspData();
-setupInstallPrompt();
-bindEvents();
-const detectedLanguage = (navigator.language || "en").slice(0, 2);
-const savedLanguage = localStorage.getItem("wifiplus-language");
-const language = savedLanguage || (translations[detectedLanguage] ? detectedLanguage : "en");
-qs("#languageSelect").value = language;
-applyLanguage(language);
-registerServiceWorker();
-// Identify the connection up front so the strip is populated before anyone
-// presses GO, then restore local history and any shared result in the URL.
-renderConnection();
-renderHistory();
-applyResultFromHash();
+
+whenIdle(() => {
+  setupNetworkCore();
+});
+whenIdle(() => {
+  initIspData().catch((error) => logError("isp data", error));
+}, 3000);
+
+// Panels below the fold fade in as they are reached. One shared observer, not
+// one per element, and it disconnects each element after it has been revealed.
+whenIdle(() => {
+  if (typeof IntersectionObserver === "undefined") {
+    qsa(".section .card, .section .panel").forEach((node) => node.classList.add("animate-in"));
+    return;
+  }
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add("animate-in");
+        observer.unobserve(entry.target);
+      }
+    },
+    { rootMargin: "0px 0px -8% 0px", threshold: 0.05 },
+  );
+  qsa(".section .card").forEach((node) => {
+    node.classList.add("animate-panel");
+    observer.observe(node);
+  });
+}, 2000);

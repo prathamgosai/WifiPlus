@@ -9,6 +9,7 @@
 const CACHE_DURATION_MS = 1000 * 60 * 5; // 5 minutes
 
 // In a real app, this would be an empty cache initially.
+/** @type {IspData[] | null} */
 let ispDataCache = null;
 let lastFetchTime = 0;
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wifiplus-v14';
+const CACHE_NAME = 'wifiplus-v17';
 // app.js is an ES module, so the modules it imports are part of the shell: without
 // them a cold offline load would fetch app.js from cache and then fail on its very
 // first import.
@@ -25,6 +25,19 @@ const APP_SHELL = [
   '/core/test-logger.js',
   '/core/ai-doctor.js',
   '/core/isp-data.js',
+  '/core/health.js',
+  // Validation and the run's self-assessment. A static import of app.js, so a
+  // cold offline load fails on it without this entry.
+  '/core/quality.js',
+  // The result surface. report.js and latency-chart.js are STATIC imports of
+  // app.js, so a cold offline load fails on them without these entries.
+  // network-core.js and result-card.js are loaded on demand — they are here so
+  // the 3D scene and the shareable card still work with no connection, not
+  // because the page would break without them.
+  '/ui/report.js',
+  '/ui/latency-chart.js',
+  '/ui/network-core.js',
+  '/ui/result-card.js',
   // The engine runs off the main thread, so the worker entry point and
   // everything it pulls in has to be cached or a cold offline load cannot start
   // a test at all.
@@ -34,6 +47,11 @@ const APP_SHELL = [
   // makes every one of them work offline without listing each page.
   '/landing.css',
   '/landing.js',
+  // Self-hosted faces. Without these an offline load falls back to a system
+  // font and the dial readout loses its tabular figures, which is the one
+  // place a substituted font actually changes the layout mid-run.
+  '/fonts/inter-latin.woff2',
+  '/fonts/jetbrains-mono-latin.woff2',
   '/manifest.webmanifest',
   '/icon.svg'
 ];

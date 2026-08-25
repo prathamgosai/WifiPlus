@@ -33,6 +33,19 @@ import { log, logError } from "../core/test-logger.js";
 let currentAbort = null;
 
 /**
+ * Conditions the run happened under, which the engine cannot observe from
+ * inside a worker. A worker has no `document`, so `visibilityState` is
+ * unreachable here and the page has to report it.
+ *
+ * These never change a measured number. They change how much the run is willing
+ * to claim for one — which is the only honest response to a window the browser
+ * may have been throttling.
+ *
+ * @type {{ hiddenDuringRun: boolean, wentOffline: boolean }}
+ */
+let environment = { hiddenDuringRun: false, wentOffline: false };
+
+/**
  * An endpoint reduced to what can be cloned and what the UI actually shows.
  *
  * @param {{ name?: string } | null | undefined} endpoint
@@ -50,7 +63,8 @@ const endpointName = (endpoint) => (endpoint && typeof endpoint.name === "string
  * @param {import("../core/run.js").RunOutcome} outcome
  */
 function serialiseOutcome(outcome) {
-  const { result, latency, bufferbloat, edgeLabel, uploadNote } = outcome;
+  const { result, latency, bufferbloat, downloadBloat, uploadBloat, quality, evidence, edgeLabel, uploadNote } =
+    outcome;
   return {
     result: {
       download: result.download ?? null,
@@ -75,17 +89,80 @@ function serialiseOutcome(outcome) {
       : null,
     // Null is a real answer here: too few probes survived the saturated link to
     // grade it. The page must handle it rather than reading `.increase` off it.
-    bufferbloat: bufferbloat
+    bufferbloat: cloneBloat(bufferbloat),
+    // The same measurement taken in each direction. Consumer links are
+    // asymmetric, so these routinely disagree, and the one that matters is
+    // whichever is worse — `bufferbloat` above already holds that.
+    downloadBloat: cloneBloat(downloadBloat),
+    uploadBloat: cloneBloat(uploadBloat),
+    // The run's own assessment of how much weight its numbers carry. Plain
+    // data by construction: arrays of strings and numbers only.
+    quality: quality
       ? {
-          idle: bufferbloat.idle,
-          loaded: bufferbloat.loaded,
-          increase: bufferbloat.increase,
-          grade: bufferbloat.grade,
+          level: quality.level,
+          verdict: quality.verdict,
+          reasons: [...quality.reasons],
+          passed: [...quality.passed],
+          reconcile: { ...quality.reconcile },
+        }
+      : null,
+    // The bytes and spans every figure was derived from. Rebuilt field by field
+    // for the same reason the outcome is: a spread would carry through whatever
+    // the engine adds later, including something unclonable.
+    evidence: evidence
+      ? {
+          download: cloneThroughput(evidence.download),
+          upload: cloneThroughput(evidence.upload),
+          idleProbes: evidence.idleProbes,
+          downloadLoadedProbes: evidence.downloadLoadedProbes,
+          uploadLoadedProbes: evidence.uploadLoadedProbes,
+          protocol: evidence.protocol ?? null,
         }
       : null,
     endpointName: endpointName(outcome.endpoint),
     edgeLabel,
     uploadNote: uploadNote ?? null,
+  };
+}
+
+/**
+ * @param {import("../core/measure.js").BufferbloatResult | null | undefined} bloat
+ */
+function cloneBloat(bloat) {
+  return bloat
+    ? {
+        idle: bloat.idle,
+        loaded: bloat.loaded,
+        increase: bloat.increase,
+        grade: bloat.grade,
+        // Which statistic produced the grade, and how many probes backed it.
+        // A grade whose basis is invisible is a letter, not a measurement.
+        basis: bloat.basis,
+        probes: bloat.probes,
+      }
+    : null;
+}
+
+/**
+ * @param {import("../core/measure.js").ThroughputResult | null | undefined} t
+ */
+function cloneThroughput(t) {
+  if (!t) return null;
+  return {
+    mbps: t.mbps,
+    bytes: t.bytes,
+    elapsedMs: t.elapsedMs,
+    measuredBytes: t.measuredBytes,
+    measuredMs: t.measuredMs,
+    // Capped: a fast link produces hundreds of intervals and the page only ever
+    // draws a trace from them. The full set stays in the worker.
+    samples: t.samples.slice(0, 400),
+    streams: t.streams,
+    method: t.method,
+    reconciliationMbps: t.reconciliationMbps,
+    warmupMs: t.warmupMs,
+    protocol: t.protocol ?? null,
+    posts: Array.isArray(t.posts) ? t.posts.slice(0, 200).map((p) => ({ ...p })) : undefined,
   };
 }
 
@@ -96,6 +173,8 @@ self.onmessage = async (e) => {
     if (currentAbort) currentAbort.abort();
     currentAbort = new AbortController();
     const abort = currentAbort;
+    // A fresh run must not inherit the previous run's conditions.
+    environment = { hiddenDuringRun: false, wentOffline: false };
 
     try {
       log("run started");
@@ -145,19 +224,12 @@ self.onmessage = async (e) => {
               },
             }),
           onBufferbloat: (bloat) =>
-            self.postMessage({
-              type: "onBufferbloat",
-              data: bloat
-                ? {
-                    idle: bloat.idle,
-                    loaded: bloat.loaded,
-                    increase: bloat.increase,
-                    grade: bloat.grade,
-                  }
-                : null,
-            }),
+            self.postMessage({ type: "onBufferbloat", data: cloneBloat(bloat) }),
+          onUploadBufferbloat: (bloat) =>
+            self.postMessage({ type: "onUploadBufferbloat", data: cloneBloat(bloat) }),
         },
         abort.signal,
+        environment,
       );
 
       log("run complete", outcome.result);
@@ -181,7 +253,15 @@ self.onmessage = async (e) => {
       currentAbort = null;
     }
   } else if (type === "visibility") {
-    // If we wanted to pause or degrade gracefully on tab switch, handle it here.
-    // For now, core/run.js handles its own resilience.
+    // Latching, not tracking: once a run has spent ANY time backgrounded, the
+    // window it measured is suspect for the rest of the run. Clearing the flag
+    // when the tab came back would let a user hide the tab through the whole
+    // download and get a clean bill of health by returning at the end.
+    if (currentAbort && e.data?.data?.visible === false) {
+      environment.hiddenDuringRun = true;
+      log("run backgrounded — result will be marked reduced-confidence");
+    }
+  } else if (type === "offline") {
+    if (currentAbort) environment.wentOffline = true;
   }
 };

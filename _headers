@@ -32,3 +32,9 @@
 
 /core/*
   Cache-Control: public, max-age=0, must-revalidate
+
+# Font files are content-addressed by name and never edited in place: a new
+# version ships under a new filename. Caching them for a year is what makes
+# self-hosting cheaper than the third-party stylesheet it replaced.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -28,7 +28,7 @@ afterEach(() => {
 /**
  * A `fetch` that answers every measurement route plausibly and quickly.
  *
- * @param {{ failUpload?: boolean, failDownload?: boolean }} [opts]
+ * @param {{ failUpload?: boolean, failDownload?: boolean, failLatency?: boolean }} [opts]
  */
 function stubNetwork(opts = {}) {
   // Upload runs over XHR, because upload.onprogress is the only browser API
@@ -52,6 +52,7 @@ function stubNetwork(opts = {}) {
     }
     if (href.includes("bytes=0")) {
       // A latency probe.
+      if (opts.failLatency) throw new Error("probe refused");
       await new Promise((r) => setTimeout(r, 2));
       return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(0) };
     }
@@ -194,5 +195,29 @@ describe("runMeasurement", () => {
     const outcome = await runMeasurement();
     expect(outcome.endpoint.name).toBe("Cloudflare");
     expect(outcome.edgeLabel).toContain("Cloudflare");
+  }, 30_000);
+
+  it("reports nothing rather than zero when the latency phase fails outright", async () => {
+    // The regression this exists for: the failure path substituted
+    // { ping: 0, jitter: 0, loss: 0 } for the readings it never got. Zero is a
+    // finite number, so every downstream gate — the badge state, the metric
+    // tiles, the exported card — accepted it as a measurement, and an offline
+    // browser reported a 0 ms ping with 0% loss and stamped it "measured".
+    // A metric that could not be measured has to be null all the way out.
+    stubNetwork({ failLatency: true });
+
+    const outcome = await runMeasurement();
+
+    expect(outcome.result.ping).toBeNull();
+    expect(outcome.result.jitter).toBeNull();
+    expect(outcome.result.loss).toBeNull();
+    expect(outcome.latency.samples).toEqual([]);
+    // Bufferbloat is the difference between idle and loaded latency, so with
+    // no idle figure there is no difference to state.
+    expect(outcome.bufferbloat).toBeNull();
+    // Stability is a function of the latency spread, which does not exist.
+    expect(outcome.result.stability).toBeNull();
+    // The phases that did work are unaffected.
+    expect(outcome.result.download).toBeGreaterThan(0);
   }, 30_000);
 });

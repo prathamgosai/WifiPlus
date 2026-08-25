@@ -108,6 +108,7 @@ export function getHistoryStats(store = defaultStore()) {
   const validUploads = history.map(h => h.upload).filter(v => v !== null && v > 0);
   const validPings = history.map(h => h.ping).filter(v => v !== null && v > 0);
 
+  /** @param {number[]} arr */
   const calc = (arr) => {
     if (arr.length === 0) return null;
     const best = Math.max(...arr);

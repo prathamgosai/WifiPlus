@@ -155,10 +155,10 @@ describe("measureUpload window", () => {
     const elapsed = Date.now() - started;
 
     expect(elapsed).toBeLessThan(UPLOAD_MEASURE_MS + 6000);
-    if (!threw) {
-      // A real completed post, not a constant divided by the window.
-      expect(result).toBeGreaterThan(0);
-      expect(Number.isFinite(result ?? NaN)).toBe(true);
+    if (!threw && result) {
+      // A real acknowledged post, not a constant divided by the window.
+      expect(result.mbps).toBeGreaterThan(0);
+      expect(Number.isFinite(result.mbps)).toBe(true);
     }
   }, 20_000);
 
@@ -196,9 +196,9 @@ describe("measureUpload window", () => {
     // The regression: a 13.3 Mbps download seeded chunks a 0.6 Mbps uplink
     // could not finish inside the window, so the phase reported nothing.
     installXhrStub({ bytesPerMs: 75, progressEveryMs: 100 });
-    const mbps = await measureUpload(undefined, undefined, undefined, 13.3);
-    expect(mbps).toBeGreaterThan(0);
-    expect(Number.isFinite(mbps)).toBe(true);
+    const result = await measureUpload(undefined, undefined, undefined, 13.3);
+    expect(result.mbps).toBeGreaterThan(0);
+    expect(Number.isFinite(result.mbps)).toBe(true);
   }, 20_000);
 });
 

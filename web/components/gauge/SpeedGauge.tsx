@@ -17,7 +17,15 @@ const ARC_PATH = `M ${CX - RADIUS} ${CY} A ${RADIUS} ${RADIUS} 0 0 1 ${CX + RADI
 
 interface SpeedGaugeProps {
   /** Current reading in Mbps. */
-  value: number;
+  /**
+   * The measurement, or null when there is not one yet.
+   *
+   * Nullable on purpose: a phase that has produced nothing has produced
+   * nothing, and a dial that renders that as 0.00 is asserting a reading it
+   * does not have. The needle rests at the floor and the readout shows an em
+   * dash instead.
+   */
+  value: number | null;
   /** Stage caption under the readout — "Testing download…", "Complete". */
   stage: string;
   /** Drives the pulse on the hub and the arc glow. */
@@ -53,14 +61,17 @@ export function SpeedGauge({
   const [stops, setStops] = useState<number[]>([...BASE_STOPS]);
   useEffect(() => {
     setStops((previous) => {
-      const next = scaleFor(value, previous);
+      const next = scaleFor(value ?? 0, previous);
       return next.length === previous.length && next[next.length - 1] === previous[previous.length - 1]
         ? previous
         : next;
     });
   }, [value]);
 
-  const smooth = useSmoothValue(value, { responsiveness: 0.28 });
+  const measured = typeof value === "number" && Number.isFinite(value);
+  // The needle still eases to the floor when a value goes away, rather than
+  // snapping — but the READOUT does not print the number it eased through.
+  const smooth = useSmoothValue(measured ? value : 0, { responsiveness: 0.28 });
   const fraction = fractionFor(smooth, stops);
 
   const ticks = useMemo(
@@ -84,10 +95,10 @@ export function SpeedGauge({
         viewBox="0 0 400 322"
         className="w-full"
         role="meter"
-        aria-valuenow={Math.round(smooth)}
+        {...(measured ? { "aria-valuenow": Math.round(smooth) } : {})}
         aria-valuemin={0}
         aria-valuemax={stops[stops.length - 1]}
-        aria-valuetext={`${smooth.toFixed(2)} ${unit}. ${stage}`}
+        aria-valuetext={measured ? `${smooth.toFixed(2)} ${unit}. ${stage}` : `Not measured. ${stage}`}
         aria-label="Connection speed"
       >
         <defs>
@@ -225,7 +236,7 @@ export function SpeedGauge({
           by it. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center pb-1">
         <p className="tabular font-display text-[clamp(2.5rem,9vw,4rem)] font-extrabold leading-none tracking-tight">
-          {smooth.toFixed(2)}
+          {measured ? smooth.toFixed(2) : "—"}
         </p>
         <p className="mt-1 text-sm font-semibold text-[color:var(--page-fg-muted)]">{unit}</p>
         <p

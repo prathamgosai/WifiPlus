@@ -17,15 +17,21 @@
  * @returns {object} Diagnosis and recommendations
  */
 export function generateAiDiagnosis(speed, bufferbloat) {
+  /** @type {{ summary: string, recommendations: string[] }} */
   const diagnosis = {
     summary: "",
     recommendations: []
   };
 
-  const isFast = speed.download > 100;
-  const isSlow = speed.download < 25;
-  const highPing = speed.ping > 80;
-  const hasLoss = speed.loss > 2;
+  const download = speed.download || 0;
+  const ping = speed.ping || 0;
+  const loss = speed.loss || 0;
+  const jitter = speed.jitter || 0;
+
+  const isFast = download > 100;
+  const isSlow = download < 25;
+  const highPing = ping > 80;
+  const hasLoss = loss > 2;
 
   // Throughput and latency baseline
   if (isFast && !highPing && !hasLoss) {
@@ -59,7 +65,7 @@ export function generateAiDiagnosis(speed, bufferbloat) {
     diagnosis.recommendations.push("If you are paying for a faster plan, try moving closer to your router or restarting it.");
   }
 
-  if (speed.jitter > 30) {
+  if (jitter > 30) {
     diagnosis.recommendations.push("High jitter detected. If you're on WiFi, you may be experiencing signal interference. A wired Ethernet connection is recommended for competitive gaming.");
   }
 

@@ -104,9 +104,25 @@ export function getHistoryStats(store = defaultStore()) {
   const history = loadHistory(store);
   if (!history || history.length === 0) return null;
 
-  const validDownloads = history.map(h => h.download).filter(v => v !== null && v > 0);
-  const validUploads = history.map(h => h.upload).filter(v => v !== null && v > 0);
-  const validPings = history.map(h => h.ping).filter(v => v !== null && v > 0);
+  /**
+   * Entries worth averaging, as a type the checker can see through.
+   *
+   * A predicate arrow rather than a plain one: `v !== null` narrows at runtime
+   * but tells the checker nothing, so the result stayed `(number | null)[]` and
+   * every call below failed to compile. Same pattern as `core/scoring.js`.
+   *
+   * @param {(number | null | undefined)[]} values
+   * @returns {number[]}
+   */
+  const usable = (values) =>
+    values.filter(
+      /** @returns {value is number} */
+      (value) => typeof value === "number" && Number.isFinite(value) && value > 0,
+    );
+
+  const validDownloads = usable(history.map((h) => h.download));
+  const validUploads = usable(history.map((h) => h.upload));
+  const validPings = usable(history.map((h) => h.ping));
 
   /** @param {number[]} arr */
   const calc = (arr) => {

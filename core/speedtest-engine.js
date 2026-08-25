@@ -26,7 +26,12 @@ function calculateMedian(arr) {
   if (!arr.length) return 0;
   const sorted = [...arr].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  // Both indices are in range — the length guard above rules out the empty
+  // case — so the coalesces are unreachable and exist only to give the checker
+  // the `number` it needs. Without them this returns `number | undefined` and
+  // every caller of calculateMedian fails to compile.
+  if (sorted.length % 2 !== 0) return sorted[mid] ?? 0;
+  return ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
 }
 
 /** @param {number[]} arr */
@@ -34,7 +39,9 @@ function calculateP95(arr) {
   if (!arr.length) return 0;
   const sorted = [...arr].sort((a, b) => a - b);
   const rank = Math.floor(0.95 * (sorted.length - 1));
-  return sorted[rank];
+  // `rank` is bounded by construction: 0 <= floor(0.95 * (n - 1)) < n for n >= 1,
+  // and n = 0 returned above.
+  return sorted[rank] ?? 0;
 }
 
 /** @param {number[]} arr */
@@ -42,7 +49,8 @@ function calculateJitter(arr) {
   if (arr.length < 2) return 0;
   let totalDiff = 0;
   for (let i = 1; i < arr.length; i++) {
-    totalDiff += Math.abs(arr[i] - arr[i - 1]);
+    // `i` runs from 1 to arr.length - 1, so both reads are in range.
+    totalDiff += Math.abs((arr[i] ?? 0) - (arr[i - 1] ?? 0));
   }
   return totalDiff / (arr.length - 1);
 }

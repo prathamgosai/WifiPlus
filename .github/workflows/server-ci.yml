@@ -14,10 +14,16 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          # Node 24 rather than 20: Node 20 reached end-of-life in April 2026, and
+          # the runner already forces the actions above onto Node 24. Pinning the
+          # job to 20 meant CI was the only place this code ran on an unsupported
+          # runtime. NOTE: package.json still declares "engines": ">=20", which is
+          # now a claim nothing verifies — raise it or add a matrix if that floor
+          # is meant to be real.
+          node-version: "24"
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci

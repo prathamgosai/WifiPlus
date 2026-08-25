@@ -17,10 +17,16 @@ jobs:
       run:
         working-directory: core
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          # Node 24 rather than 20: Node 20 reached end-of-life in April 2026, and
+          # the runner already forces the actions above onto Node 24. Pinning the
+          # job to 20 meant CI was the only place this code ran on an unsupported
+          # runtime. NOTE: package.json still declares "engines": ">=20", which is
+          # now a claim nothing verifies — raise it or add a matrix if that floor
+          # is meant to be real.
+          node-version: "24"
       - run: npm install --no-audit --no-fund
       - name: Typecheck (JSDoc types, checkJs)
         run: npm run typecheck
@@ -35,10 +41,10 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
@@ -53,10 +59,10 @@ jobs:
     name: static shell
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
       # The static site has no build step by design, so the checks that matter are
       # that it parses and that every module it imports actually exists — a broken
       # import path would 404 at runtime with no build to catch it.

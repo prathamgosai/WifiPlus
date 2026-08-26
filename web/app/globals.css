@@ -575,3 +575,31 @@
     background-color: color-mix(in oklab, var(--page-bg) 82%, var(--page-fg) 8%);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Gauge micro-particles
+   -----------------------------------------------------------------------------
+   A dashed arc whose offset is animated, which renders as a stream of specks
+   running the length of the dial. One element and one animated property, rather
+   than N circles on motion paths.
+
+   `stroke-dashoffset` is not a compositor property, so this does repaint — but
+   it repaints one thin path inside an already-composited SVG layer, which is
+   measurably cheaper here than the alternative of animating dozens of nodes.
+   The global `prefers-reduced-motion` rule in Layer 3 stops it like anything
+   else, and the element is additionally hidden by `motion-reduce:hidden`.
+   ------------------------------------------------------------------------ */
+@keyframes gauge-spark-run {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -160;
+  }
+}
+
+.gauge-spark {
+  stroke-dasharray: 1.5 22;
+  stroke-linecap: round;
+  animation: gauge-spark-run 2.4s linear infinite;
+}

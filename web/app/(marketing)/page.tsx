@@ -2,6 +2,7 @@ import { SpeedTestProvider } from "@/components/providers/SpeedTestProvider";
 import { IspProvider } from "@/components/providers/IspProvider";
 
 import { Hero } from "@/components/sections/Hero";
+import { SpeedDashboard } from "@/components/sections/SpeedDashboard";
 import { Features } from "@/components/sections/Features";
 import { HowItWorks } from "@/components/sections/HowItWorks";
 import { Ecosystem } from "@/components/sections/Ecosystem";
@@ -38,6 +39,11 @@ export default function HomePage() {
     <SpeedTestProvider>
       <IspProvider>
         <Hero />
+        {/* The report is a sibling of the hero rather than a child of it: the
+            hero owns the instrument and the CTA, this owns everything the run
+            produced. Keeping them separate is what lets the hero avoid
+            subscribing to the store at all. */}
+        <SpeedDashboard />
         <Features />
         <HowItWorks />
         <Ecosystem />

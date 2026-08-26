@@ -101,15 +101,36 @@ export function detectCapability(): Capability {
   }
 
   const cores = nav.hardwareConcurrency ?? 4;
-  const memory = nav.deviceMemory ?? 4;
+
+  /*
+   * ABSENT IS UNKNOWN, NOT LOW.
+   *
+   * This read used to be `nav.deviceMemory ?? 4`, feeding a `memory <= 4`
+   * demotion. `navigator.deviceMemory` is a Chrome-only API: Safari and Firefox
+   * do not implement it and never have. So every Safari and Firefox desktop —
+   * an M4 Max included — resolved to 4, tripped the demotion, and silently got
+   * the light tier: 320 packets instead of 900, DPR capped at 1.5, antialias
+   * off, and (via `interactive`) no pointer parallax at all.
+   *
+   * A capability we cannot query is not evidence of a weak device. Only demote
+   * on a value the browser actually gave us.
+   */
+  const memory = nav.deviceMemory;
+  const lowMemory = memory !== undefined && memory <= 4;
+
   // `pointer: coarse` is a far better proxy for "phone" than a UA string, and
   // it degrades correctly on tablets and touch laptops.
   const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
-  const small = window.matchMedia?.("(max-width: 900px)").matches ?? false;
+  // 700, not 900: a desktop user who happens to load in a half-width window is
+  // a desktop user. 900px caught a large share of side-by-side desktop browsers
+  // and demoted them for the rest of the session.
+  const small = window.matchMedia?.("(max-width: 700px)").matches ?? false;
 
-  if (coarse || small || cores <= 4 || memory <= 4) {
-    return { tier: "light", dpr: [1, 1.5], packets: 320, reason: `light tier (${cores} cores, ${memory}GB)` };
+  const describe = `${cores} cores, ${memory === undefined ? "unknown" : `${memory}GB`}`;
+
+  if (coarse || small || cores <= 4 || lowMemory) {
+    return { tier: "light", dpr: [1, 1.5], packets: 320, reason: `light tier (${describe})` };
   }
 
-  return { tier: "full", dpr: [1, 2], packets: 900, reason: `full tier (${cores} cores, ${memory}GB)` };
+  return { tier: "full", dpr: [1, 2], packets: 900, reason: `full tier (${describe})` };
 }

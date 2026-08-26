@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { HOP_NAME } from "@/lib/hops";
 
 /**
  * The network the scene draws.
@@ -46,7 +47,7 @@ export const NODES: TopologyNode[] = [
   {
     id: "device",
     kind: "device",
-    label: "Your device",
+    label: HOP_NAME.device ?? "Your device",
     position: new THREE.Vector3(-4.35, -0.45, 0.75),
     radius: 0.2,
     litBy: ["latency", "download", "upload", "complete"],
@@ -54,7 +55,7 @@ export const NODES: TopologyNode[] = [
   {
     id: "router",
     kind: "router",
-    label: "Router",
+    label: HOP_NAME.router ?? "Router",
     position: new THREE.Vector3(-2.15, 0.55, -0.25),
     radius: 0.17,
     litBy: ["latency", "download", "upload", "complete"],
@@ -62,7 +63,7 @@ export const NODES: TopologyNode[] = [
   {
     id: "isp",
     kind: "isp",
-    label: "ISP",
+    label: HOP_NAME.isp ?? "ISP",
     position: new THREE.Vector3(0.05, -0.25, 0),
     radius: 0.32,
     litBy: ["latency", "download", "upload", "complete"],
@@ -70,7 +71,7 @@ export const NODES: TopologyNode[] = [
   {
     id: "edge",
     kind: "edge",
-    label: "Measurement edge",
+    label: HOP_NAME.edge ?? "Measurement edge",
     position: new THREE.Vector3(2.3, 0.65, -0.35),
     radius: 0.21,
     litBy: ["discovering", "latency", "download", "upload", "complete"],
@@ -78,7 +79,7 @@ export const NODES: TopologyNode[] = [
   {
     id: "internet",
     kind: "internet",
-    label: "Internet",
+    label: HOP_NAME.internet ?? "Internet",
     position: new THREE.Vector3(4.45, -0.35, 0.55),
     radius: 0.25,
     litBy: ["download", "upload", "complete"],
@@ -117,7 +118,10 @@ export function satellites(count: number): TopologyNode[] {
         Math.sin(angle) * radius * 0.46,
         -2.4 - t * 3.6,
       ),
-      radius: 0.035 + (i % 5 === 0 ? 0.03 : 0),
+      // Graded with depth as well as dimmed by fog. Aerial perspective is
+      // size AND value; attenuating brightness alone reads as a fade rather
+      // than as distance.
+      radius: (0.035 + (i % 5 === 0 ? 0.03 : 0)) * (1 - t * 0.45),
       litBy: [],
     });
   }

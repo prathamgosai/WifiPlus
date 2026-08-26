@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * hero's background is not why anyone came. Three rules follow from that:
  *
  * 1. THE 3D CODE IS NOT IN THE INITIAL BUNDLE. `next/dynamic` with `ssr: false`
- *    puts three, R3F, drei and the scene in a chunk that is only requested on
+ *    puts three, R3F and the scene in a chunk that is only requested on
  *    devices that will actually render it. A phone that falls back to the 2D
  *    canvas never downloads a byte of it.
  *
@@ -34,8 +34,15 @@ const NetworkScene = dynamic(() => import("./NetworkScene"), {
   loading: () => null,
 });
 
-/** Fallback stays mounted through the crossfade, then unmounts. */
-const CROSSFADE_MS = 700;
+/**
+ * How long the 2D fallback stays mounted after the scene becomes visible.
+ *
+ * Deliberately longer than the CSS crossfade. The 3D scene now draws itself in
+ * over ~2.2s, so at 700ms `birth.t` is still around 0.15 and the hero would be
+ * very nearly empty for most of a second — worse than the cross-dissolve it
+ * replaced. This holds the fallback until the links have actually drawn.
+ */
+const CROSSFADE_MS = 1400;
 
 export function NetworkStage({ className }: { className?: string }) {
   const [capability, setCapability] = useState<Capability | null>(null);

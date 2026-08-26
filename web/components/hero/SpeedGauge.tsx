@@ -190,16 +190,22 @@ export function SpeedGauge({
             <stop offset="100%" stopColor={tone.via} stopOpacity="0" />
           </radialGradient>
 
-          {/* Bloom. Applied to a COPY of the arc underneath, never to the sharp
-              stroke itself — filtering the visible stroke softens the edge the
-              whole dial is read from. */}
-          <filter id={`${uid}-bloom`} x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="10" />
-          </filter>
+          {/*
+            THERE ARE DELIBERATELY NO feGaussianBlur FILTERS HERE ANY MORE.
 
-          <filter id={`${uid}-soft`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" />
-          </filter>
+            The bloom used to be a blurred duplicate of the progress arc. The
+            problem is not the blur itself — it is that the arc's
+            `stroke-dashoffset` changes on every throughput sample (~25 Hz
+            during a run), and Chrome does not GPU-accelerate an SVG filter
+            whose filtered geometry changes. Each sample forced a CPU re-raster
+            of a ~400x250px region, on the same main thread the measurement
+            engine is timing with performance.now().
+
+            A wider, lower-opacity stroke of the same path gives the halo for
+            free: no filter region, no re-raster, and it composites like any
+            other stroke. Once the WebGL scene grows a real bloom pass, the
+            glow can come from there instead.
+          */}
         </defs>
 
         {/* ---- Bezel: two hairlines that give the instrument physical depth. */}
@@ -257,14 +263,23 @@ export function SpeedGauge({
             strokeDashoffset: ARC_LENGTH * (1 - fraction),
           }}
         >
+          {/* The halo: same path, much wider, low opacity. Reads as bloom
+              against the dark plate and costs one extra stroke. */}
           <path
             d={ARC(RADIUS)}
             fill="none"
             stroke={`url(#${uid}-arc)`}
-            strokeWidth={THICKNESS + 4}
+            strokeWidth={THICKNESS + 16}
             strokeLinecap="round"
-            filter={`url(#${uid}-bloom)`}
-            opacity={active ? 0.9 : 0.5}
+            opacity={active ? 0.22 : 0.12}
+          />
+          <path
+            d={ARC(RADIUS)}
+            fill="none"
+            stroke={`url(#${uid}-arc)`}
+            strokeWidth={THICKNESS + 7}
+            strokeLinecap="round"
+            opacity={active ? 0.34 : 0.18}
           />
           <path
             d={ARC(RADIUS)}
@@ -288,8 +303,7 @@ export function SpeedGauge({
             strokeWidth={2.5}
             strokeLinecap="round"
             className="gauge-spark motion-reduce:hidden"
-            opacity={0.75}
-            filter={`url(#${uid}-soft)`}
+            opacity={0.6}
           />
         )}
 

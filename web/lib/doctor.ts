@@ -166,3 +166,71 @@ export function diagnose(
     suitability: fits,
   };
 }
+
+/* ---------------------------------------------------------------------------
+   Reconciling the two hop models
+   ------------------------------------------------------------------------ */
+
+/** 0 = no verdict, 1 = ok, 2 = suspect, 3 = measured but unjudgeable. */
+export type HopFlag = 0 | 1 | 2 | 3;
+
+const FLAG: Record<FindingTone, HopFlag> = { ok: 1, suspect: 2, unknown: 3 };
+
+/**
+ * Maps `bottleneck()`'s hops onto the 3D topology's nodes and links.
+ *
+ * The two models genuinely differ, and the difference is not cosmetic:
+ *
+ *   core/health.js  device · wifi · router · isp · internet
+ *   topology.ts     device · router · isp · edge · internet
+ *
+ * `wifi` is the one that matters. It is the hop `bottleneck()` flags more often
+ * than any other, and it is NOT a node — the wireless leg is the segment
+ * BETWEEN the device and the router. A node-indexed array therefore cannot
+ * express the single most common diagnosis this engine makes, which is why the
+ * links carry flags too and why `wifi` is routed to link 0.
+ *
+ * The trailing `internet` node deliberately receives NO verdict. `bottleneck()`
+ * emits an `internet` hop, but `lib/doctor.ts`'s own HOP_LABEL renders it as
+ * "Measurement edge" and health.js documents it as the reference point rather
+ * than a suspect — so it belongs on the `edge` node. Giving the fifth node a
+ * plausible-looking verdict it never earned is exactly the failure the
+ * provenance labelling exists to prevent.
+ *
+ * @returns node flags indexed as topology.ts NODES, and link flags as LINKS.
+ */
+export function hopFlags(hops: Array<{ hop: string; flag: FindingTone }>): {
+  nodes: HopFlag[];
+  links: HopFlag[];
+} {
+  const nodes: HopFlag[] = [0, 0, 0, 0, 0];
+  const links: HopFlag[] = [0, 0, 0, 0];
+
+  for (const { hop, flag } of hops) {
+    const value = FLAG[flag] ?? 0;
+    switch (hop) {
+      case "device":
+        nodes[0] = value;
+        break;
+      // The wireless leg is the device→router LINK, not a node.
+      case "wifi":
+        links[0] = value;
+        break;
+      case "router":
+        nodes[1] = value;
+        break;
+      case "isp":
+        nodes[2] = value;
+        break;
+      // health.js's "internet" hop IS the measurement edge — the reference
+      // point the run was taken against.
+      case "internet":
+        nodes[3] = value;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return { nodes, links };
+}

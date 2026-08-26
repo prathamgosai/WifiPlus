@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { runMeasurement } from "@core/run.js";
 import { saveHistoryEntry } from "@core/history.js";
 import { qualityScores } from "@/lib/scoring";
+import { diagnose, hopFlags, type HopFlag } from "@/lib/doctor";
 import { TestAborted, type BufferbloatResult, type LatencyResult } from "@/lib/speedtest";
 import { type StageId, STAGES, stageFor } from "@/lib/stages";
 import type { QualityScores, SpeedResult, TestPhase } from "@/types";
@@ -104,6 +105,25 @@ export interface Drive {
    * measured verdict rather than being a fixed "finished" green.
    */
   health: number;
+
+  /**
+   * Per-hop verdicts, so the scene can point at the ONE hop the diagnosis
+   * actually implicates instead of tinting all five with the same overall
+   * health — which is the literal opposite of a bottleneck finding, the scene
+   * answering "everywhere, equally".
+   *
+   * Indexed as `topology.ts` NODES; 0 = no verdict, 1 = ok, 2 = suspect,
+   * 3 = measured but unjudgeable. Written once per run, never per frame.
+   */
+  hopFlags: HopFlag[];
+
+  /**
+   * The same, per LINK. Not redundant: `bottleneck()` flags a `wifi` hop more
+   * often than any other, and the wireless leg is the device→router SEGMENT
+   * rather than a node — so the commonest diagnosis this engine makes has no
+   * node to live on. See `hopFlags()` in lib/doctor.ts.
+   */
+  linkFlags: HopFlag[];
 }
 
 /* `progress` is deliberately NOT here. It is already React state, it changes a
@@ -117,6 +137,8 @@ export const drive: Drive = {
   intensity: 0,
   pulse: 0,
   health: 0,
+  hopFlags: [0, 0, 0, 0, 0],
+  linkFlags: [0, 0, 0, 0],
 };
 
 /**
@@ -245,6 +267,9 @@ export const useTestStore = create<TestState>((set) => ({
     drive.health = 0;
     drive.pulse = 0;
     drive.intensity = 0.35;
+    // Last run's verdicts must not survive into this one.
+    drive.hopFlags = [0, 0, 0, 0, 0];
+    drive.linkFlags = [0, 0, 0, 0];
 
     let lastDown = 0;
     let lastUp = 0;
@@ -296,8 +321,17 @@ export const useTestStore = create<TestState>((set) => ({
             if (current()) set((state) => ({ result: { ...state.result, ...patch } }));
           },
           onLatencyProbe: () => {
-            // One pulse per probe that actually returned, so the ripple in the
-            // scene is a real round trip rather than a timed animation.
+            /*
+             * One pulse per probe ATTEMPT — paced by real network activity
+             * rather than by a timer, which is the honest claim.
+             *
+             * It is NOT "one pulse per probe that returned", as this comment
+             * used to say. `core/measure.js` fires onSample at the end of every
+             * iteration including failures, and passes the most recent
+             * SUCCESSFUL round trip, so a lost probe is indistinguishable from
+             * a returned one here. Distinguishing them would mean changing the
+             * engine, which is out of bounds.
+             */
             drive.pulse += 1;
           },
           onDownloadSample: (mbps) => {
@@ -331,6 +365,25 @@ export const useTestStore = create<TestState>((set) => ({
       drive.flow = 0;
       drive.intensity = 0.3;
       drive.health = computed ? computed.health / 100 : 0;
+
+      /*
+       * Per-hop verdicts, from the SAME `diagnose()` the Network Doctor renders
+       * — so the hop the scene highlights and the hop the report names can
+       * never disagree.
+       *
+       * Order matters: this must land BEFORE the `set()` below flips the stage
+       * to "complete", because the scene reacts to that stage change and would
+       * otherwise colour the cores from the previous run's verdicts for a frame.
+       */
+      const diagnosis = diagnose(outcome.result, outcome.bufferbloat, {
+        degraded: outcome.quality.level === "low",
+        edgeLabel: outcome.edgeLabel,
+      });
+      if (diagnosis) {
+        const flags = hopFlags(diagnosis.hops);
+        drive.hopFlags = flags.nodes;
+        drive.linkFlags = flags.links;
+      }
 
       set({
         result: outcome.result,

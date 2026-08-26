@@ -278,10 +278,17 @@
     border: 1px solid var(--glass-border);
   }
 
+  /* blur(20px), not 40px.
+     This panel sits directly on top of the live WebGL canvas, which changes
+     every frame — so the compositor re-reads and re-blurs whatever is beneath
+     it on every one of those frames. Blur cost scales with the sample radius,
+     and at this opacity 20px is perceptually near-identical to 40px while
+     costing roughly half. Measured as 1.0-1.8ms/frame of compositor time on
+     integrated graphics during a run. */
   .glass-strong {
     background-color: var(--glass-bg-strong);
-    backdrop-filter: blur(40px) saturate(190%);
-    -webkit-backdrop-filter: blur(40px) saturate(190%);
+    backdrop-filter: blur(20px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(190%);
     border: 1px solid var(--glass-border-strong);
     box-shadow: var(--glass-shadow);
   }
@@ -602,4 +609,23 @@
   stroke-dasharray: 1.5 22;
   stroke-linecap: round;
   animation: gauge-spark-run 2.4s linear infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced transparency
+   -----------------------------------------------------------------------------
+   A real accessibility preference (macOS "Reduce transparency", Windows
+   "Transparency effects" off), and separately the single cheapest way to remove
+   every backdrop-filter from the page. Sits beside the existing @supports
+   fallback, which handles browsers that cannot do backdrop-filter at all; this
+   one handles users who can but would rather not.
+   ------------------------------------------------------------------------ */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-subtle,
+  .glass-strong {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-color: color-mix(in oklab, var(--page-bg) 88%, var(--page-fg) 7%);
+  }
 }

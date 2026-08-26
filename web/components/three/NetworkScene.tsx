@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { AdaptiveDpr } from "@react-three/drei";
-import { Bloom, EffectComposer, Noise, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { useTestStore } from "@/store/useTestStore";
 import type { Capability } from "@/lib/capability";
@@ -137,11 +136,6 @@ export default function NetworkScene({ capability, className = "" }: NetworkScen
         <LinkTrails nodes={NODES} />
         <PacketField count={capability.packets} nodes={NODES} />
 
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={1.1} luminanceThreshold={0.55} luminanceSmoothing={0.3} mipmapBlur />
-          <Vignette eskil={false} offset={0.2} darkness={0.7} />
-          <Noise opacity={0.025} />
-        </EffectComposer>
         <AdaptiveDpr pixelated={false} />
       </Canvas>
     </div>
